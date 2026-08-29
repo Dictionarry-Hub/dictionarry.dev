@@ -6,14 +6,8 @@ html {
 @import '../styles/themes/light.css';
 @import '../styles/themes/dark.css';
 @import '../styles/themes/retro.css';
-@import '../styles/themes/velouria.css';
 @import '../styles/themes/roswell.css';
-@import '../styles/themes/solaris.css';
 @import '../styles/themes/voyager.css';
-@import '../styles/themes/phosphor.css';
-@import '../styles/themes/vamos.css';
-@import '../styles/themes/eight.css';
-@import '../styles/themes/blue.css';
 @import '../styles/prose.css';
 
 /* Anchor jumps from the table of contents land with breathing room.

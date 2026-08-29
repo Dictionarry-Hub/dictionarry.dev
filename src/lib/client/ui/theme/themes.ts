@@ -23,15 +23,8 @@ export const THEME_DEFINITIONS = [
 	{ id: 'light', label: 'Light', emoji: '💡' },
 	{ id: 'dark', label: 'Dark', emoji: '🌑' },
 	{ id: 'retro', label: 'Retro', emoji: '📼' },
-	{ id: 'velouria', label: 'Velouria', emoji: '🪐' },
 	{ id: 'roswell', label: 'Roswell', emoji: '👽' },
-	{ id: 'solaris', label: 'Solaris', emoji: '🌊' },
-	// Eight sits eighth. If God is 7, this is the next entry.
-	{ id: 'eight', label: 'Eight', emoji: '🐒' },
-	{ id: 'voyager', label: 'Voyager', emoji: '📀' },
-	{ id: 'phosphor', label: 'Phosphor', emoji: '📡' },
-	{ id: 'vamos', label: 'Vamos', emoji: '💃' },
-	{ id: 'blue', label: 'Blue', emoji: '💙' }
+	{ id: 'voyager', label: 'Voyager', emoji: '📀' }
 ] as const satisfies readonly ThemeDefinition[];
 
 export type Theme = (typeof THEME_DEFINITIONS)[number]['id'];

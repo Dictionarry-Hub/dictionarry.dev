@@ -801,7 +801,7 @@ token) so native scrollbars and form controls match.
 
 ## Theming
 
-Seven themes, each defining the complete token set. No base+override layering. Theme files live in
+Five themes, each defining the complete token set. No base+override layering. Theme files live in
 `src/styles/themes/`.
 
 ```
@@ -809,9 +809,7 @@ src/styles/themes/
 ├── light.css      # :root selector (default)
 ├── dark.css       # [data-theme="dark"]
 ├── retro.css      # [data-theme="retro"]
-├── velouria.css   # [data-theme="velouria"]
 ├── roswell.css    # [data-theme="roswell"]
-├── solaris.css    # [data-theme="solaris"]
 └── voyager.css    # [data-theme="voyager"]
 ```
 
