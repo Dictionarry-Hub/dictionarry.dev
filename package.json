@@ -60,6 +60,7 @@
 		"wrangler": "^4.118.0"
 	},
 	"dependencies": {
+		"@lucide/lab": "^0.2.0",
 		"@lucide/svelte": "^1.28.0",
 		"marked": "^18.0.9",
 		"plyr": "^3.8.4",

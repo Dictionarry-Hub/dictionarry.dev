@@ -500,7 +500,7 @@ Select control backed by a dropdown menu. Wraps `Dropdown`, `DropdownHeader`, an
 
 `header` renders a `DropdownHeader` at the top of the menu (e.g. "Theme", "Database"). `iconOnly`
 renders just the matched option's icon as the trigger button. An option `emoji` takes precedence
-over its `icon`, in menu items and in the `iconOnly` trigger (used by the theme switcher). Emoji
+over its `icon`, in menu items and in the `iconOnly` trigger. Emoji
 rendering is platform-owned: glyphs differ across operating systems.
 
 ### Badge
@@ -824,7 +824,7 @@ The active theme is set via `data-theme` on `<html>`. Light is the default (no a
 - **Store**: `src/lib/client/ui/theme/theme.svelte.ts` provides reactive state and a `set()` method
   for runtime switching.
 - **Registry**: `src/lib/client/ui/theme/themes.ts` is the single source of truth for theme identity
-  (id, label, emoji). The `Theme` type, the `THEMES` array, and the switcher options all derive from
+  (id, label, icon). The `Theme` type, the `THEMES` array, and the switcher options all derive from
   it.
 
 ### Adding a theme

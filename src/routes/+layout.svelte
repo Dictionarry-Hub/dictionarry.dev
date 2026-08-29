@@ -34,7 +34,7 @@
 	const themeOptions = THEME_DEFINITIONS.map((d) => ({
 		value: d.id,
 		label: d.label,
-		emoji: d.emoji
+		icon: d.icon
 	}));
 
 	const databaseIcons: Record<string, typeof BookOpen> = {
