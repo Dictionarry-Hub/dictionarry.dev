@@ -16,6 +16,11 @@ permissions:
 env:
     PUBLIC_SITE_URL: ${{ vars.SITE_URL }}
 
+# Every job pays about 25 seconds of setup (checkout, pnpm, Node, install),
+# while the compile step is about 12 seconds. So the compiled data is
+# produced inline wherever it is needed rather than passed around as an
+# artifact, and the prerendered site (hundreds of MB) never leaves the job
+# that built it.
 jobs:
     format:
         name: Format
@@ -47,8 +52,8 @@ jobs:
             - run: pnpm install --frozen-lockfile
             - run: pnpm test
 
-    compile:
-        name: Compile
+    type-check:
+        name: Type Check
         runs-on: ubuntu-latest
         timeout-minutes: 10
         steps:
@@ -63,38 +68,15 @@ jobs:
             - run: pnpm install --frozen-lockfile
             - run: pnpm compile:api
             - run: pnpm compile:pcd
-            - uses: actions/upload-artifact@v7
-              with:
-                  name: data
-                  path: src/lib/data
-                  include-hidden-files: true
-                  if-no-files-found: error
-
-    type-check:
-        name: Type Check
-        needs: compile
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v7
-            - uses: pnpm/action-setup@v6
-              with:
-                  standalone: true
-            - uses: actions/setup-node@v7
-              with:
-                  node-version: 22
-                  cache: 'pnpm'
-            - run: pnpm install --frozen-lockfile
-            - uses: actions/download-artifact@v8
-              with:
-                  name: data
-                  path: src/lib/data
             - run: pnpm check
 
+    # Build and Lint share a job because the custom lint rules read the
+    # prerendered HTML in build/. Uploading that output as an artifact and
+    # downloading it into a second job cost more than lint itself.
     build:
-        name: Build
-        needs: compile
+        name: Build + Lint
         runs-on: ubuntu-latest
-        timeout-minutes: 10
+        timeout-minutes: 15
         steps:
             - uses: actions/checkout@v7
             - uses: pnpm/action-setup@v6
@@ -105,39 +87,7 @@ jobs:
                   node-version: 22
                   cache: 'pnpm'
             - run: pnpm install --frozen-lockfile
-            - uses: actions/download-artifact@v8
-              with:
-                  name: data
-                  path: src/lib/data
+            - run: pnpm compile:api
+            - run: pnpm compile:pcd
             - run: pnpm build
-            - uses: actions/upload-artifact@v7
-              with:
-                  name: build
-                  path: build
-                  include-hidden-files: true
-                  if-no-files-found: error
-
-    lint:
-        name: Lint
-        needs: build
-        runs-on: ubuntu-latest
-        timeout-minutes: 10
-        steps:
-            - uses: actions/checkout@v7
-            - uses: pnpm/action-setup@v6
-              with:
-                  standalone: true
-            - uses: actions/setup-node@v7
-              with:
-                  node-version: 22
-                  cache: 'pnpm'
-            - run: pnpm install --frozen-lockfile
-            - uses: actions/download-artifact@v8
-              with:
-                  name: data
-                  path: src/lib/data
-            - uses: actions/download-artifact@v8
-              with:
-                  name: build
-                  path: build
             - run: pnpm lint
