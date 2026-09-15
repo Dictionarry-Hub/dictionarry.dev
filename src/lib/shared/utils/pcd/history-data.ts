@@ -34,6 +34,17 @@ function entityIndex(data: CompiledDatabase): Map<string, unknown> {
 	return index;
 }
 
+/** Date of the last recorded change to an entity (ISO), or null without history. */
+export function entityLastChanged(
+	database: string,
+	entityType: string,
+	name: string
+): string | null {
+	const entries = historyFor(database)?.[`${entityType}:${name}`];
+	const last = entries?.at(-1);
+	return last && last.date !== '' ? last.date : null;
+}
+
 /** History of one entity, newest first. Empty when none was compiled. */
 export function entityHistory(
 	data: CompiledDatabase,
