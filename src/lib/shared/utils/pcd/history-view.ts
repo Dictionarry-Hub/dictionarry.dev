@@ -12,29 +12,41 @@ import {
 	formatConditionValue,
 	formatTierMaxSize,
 	formatTierSize,
+	NAMING_FORMAT_LABELS,
 	TIER_SIZE_UNIT_LABELS
 } from './format.js';
 import { entityHref, formatChangePath } from './history.js';
 import { formatProfileScore } from './references.js';
 import { stringifyYaml } from '../yaml/stringify.js';
+import { marked } from 'marked';
 
 export type SummaryPart =
-	{ kind: 'text'; text: string } | { kind: 'ref'; text: string; href: string | null };
+	| { kind: 'text'; text: string }
+	| { kind: 'ref'; text: string; href: string | null; external?: boolean };
 
 export interface DiffSegment {
 	kind: 'same' | 'added' | 'removed';
 	text: string;
 }
 
+export interface MarkdownBlock {
+	kind: 'same' | 'added' | 'removed' | 'changed';
+	/** Rendered HTML. Changed blocks carry ins and del elements. */
+	html: string;
+}
+
 export type ChangeDetail =
 	| { kind: 'lines'; lines: DiffSegment[] }
 	| { kind: 'chars'; segments: DiffSegment[] }
-	| { kind: 'replace'; before: string; after: string };
+	| { kind: 'replace'; before: string; after: string }
+	| { kind: 'markdown'; blocks: MarkdownBlock[] }
+	| { kind: 'markdown-replace'; beforeHtml: string; afterHtml: string };
 
 /**
- * Share of characters touched above which a text change is shown as before
- * and after instead of an inline diff: past this point it is a rewrite, and
- * a rewrite has nothing readable to diff.
+ * Share of a text touched above which the change is shown as before and
+ * after instead of an inline diff: past this point it is a rewrite, and a
+ * rewrite has nothing readable to diff. Measured in tokens for plain text
+ * and in blocks for markdown.
  */
 export const TEXT_REWRITE_THRESHOLD = 0.5;
 
@@ -78,7 +90,14 @@ export function presentChange(
 		return presentText([text('Pattern changed')], change);
 	}
 	if (head?.key === 'description' && path.length === 1) {
-		return presentText([text(`Description ${verb(change)}`)], change);
+		return presentMarkdown([text(`Description ${verb(change)}`)], change);
+	}
+	if (head?.key === 'formats' && second !== undefined && path.length === 2) {
+		const label = NAMING_FORMAT_LABELS[second.key] ?? formatChangePath(second.key);
+		return presentText([text(`${label} ${verb(change)}`)], change);
+	}
+	if (head?.key === 'regex101Id' && path.length === 1) {
+		return presentRegex101(change);
 	}
 	if (head?.key === 'tags' && path.length === 1) {
 		return presentSet('Tags', change);
@@ -298,12 +317,35 @@ function presentSet(label: string, change: EntityChange): ChangeView {
 	const to = new Set(Array.isArray(change.to) ? change.to.map(String) : []);
 	const added = [...to].filter((item) => !from.has(item));
 	const removed = [...from].filter((item) => !to.has(item));
-	const parts = [
-		added.length > 0 ? `added ${added.join(', ')}` : '',
-		removed.length > 0 ? `removed ${removed.join(', ')}` : ''
-	].filter(Boolean);
-	if (parts.length === 0) return { summary: [text(`${label} reordered`)] };
-	return { summary: [text(`${label}: ${parts.join('; ')}`)] };
+	if (added.length === 0 && removed.length === 0) {
+		return { summary: [text(`${label} reordered`)] };
+	}
+	const summary: SummaryPart[] = [text(label)];
+	if (added.length > 0) summary.push(text(' added '), ...pills(added));
+	if (removed.length > 0) {
+		summary.push(text(added.length > 0 ? '; removed ' : ' removed '), ...pills(removed));
+	}
+	return { summary };
+}
+
+function pills(names: string[]): SummaryPart[] {
+	return names.flatMap((name, index) =>
+		index === 0 ? [ref(name, null)] : [text(', '), ref(name, null)]
+	);
+}
+
+function presentRegex101(change: EntityChange): ChangeView {
+	const link = (id: string): SummaryPart => ({
+		kind: 'ref',
+		text: id,
+		href: `https://regex101.com/r/${id}`,
+		external: true
+	});
+	if (typeof change.to === 'string' && change.to !== '') {
+		const word = typeof change.from === 'string' && change.from !== '' ? 'updated to' : 'added';
+		return { summary: [text(`regex101 link ${word} `), link(change.to)] };
+	}
+	return { summary: [text('regex101 link removed')] };
 }
 
 function presentScalar(label: string, change: EntityChange): ChangeView {
@@ -339,8 +381,8 @@ function withLineDiff(summary: SummaryPart[], change: EntityChange, yaml = false
 }
 
 /**
- * Long text fields (patterns, descriptions, naming formats). A small edit
- * shows as an inline character diff; a rewrite shows before and after.
+ * Long plain text fields (patterns, naming formats). A small edit shows as
+ * an inline diff; a rewrite shows before and after.
  */
 function presentText(summary: SummaryPart[], change: EntityChange): ChangeView {
 	const before = typeof change.from === 'string' ? change.from : '';
@@ -348,19 +390,167 @@ function presentText(summary: SummaryPart[], change: EntityChange): ChangeView {
 	if (before === '' || after === '') {
 		return { summary, detail: { kind: 'replace', before, after } };
 	}
-	const segments = diffSequences([...before], [...after], 'chars');
-	const touched = segments
-		.filter((segment) => segment.kind !== 'same')
-		.reduce((n, segment) => n + segment.text.length, 0);
-	if (touched / (before.length + after.length) > TEXT_REWRITE_THRESHOLD) {
+	const segments = diffText(before, after);
+	if (touchedShare(segments) > TEXT_REWRITE_THRESHOLD) {
 		return { summary, detail: { kind: 'replace', before, after } };
 	}
 	return { summary, detail: { kind: 'chars', segments } };
 }
 
+/**
+ * Markdown fields (descriptions). Diffed block by block so unchanged
+ * paragraphs render as they are, added and removed blocks are marked whole,
+ * and a paragraph edited in place gets word-level highlights.
+ */
+function presentMarkdown(summary: SummaryPart[], change: EntityChange): ChangeView {
+	const before = typeof change.from === 'string' ? change.from : '';
+	const after = typeof change.to === 'string' ? change.to : '';
+	if (before === '' || after === '') {
+		return {
+			summary,
+			detail: {
+				kind: 'markdown-replace',
+				beforeHtml: markdown(before),
+				afterHtml: markdown(after)
+			}
+		};
+	}
+
+	const blocks = pairBlocks(diffSequences(splitBlocks(before), splitBlocks(after)));
+	const touched = blocks.reduce((sum, block) => {
+		if (block.kind === 'same') return sum;
+		if (block.kind === 'changed')
+			return sum + touchedShare(diffText(block.before, block.after));
+		return sum + 1;
+	}, 0);
+	if (touched / blocks.length > TEXT_REWRITE_THRESHOLD) {
+		return {
+			summary,
+			detail: {
+				kind: 'markdown-replace',
+				beforeHtml: markdown(before),
+				afterHtml: markdown(after)
+			}
+		};
+	}
+
+	return {
+		summary,
+		detail: {
+			kind: 'markdown',
+			blocks: blocks.map((block) =>
+				block.kind === 'changed'
+					? { kind: 'changed', html: markdownWithHighlights(block.before, block.after) }
+					: { kind: block.kind, html: markdown(block.text) }
+			)
+		}
+	};
+}
+
+type PairedBlock =
+	| { kind: 'same' | 'added' | 'removed'; text: string }
+	| { kind: 'changed'; before: string; after: string };
+
+/** A removed block directly followed by an added one that mostly matches it is one edited block. */
+function pairBlocks(segments: DiffSegment[]): PairedBlock[] {
+	const out: PairedBlock[] = [];
+	for (let i = 0; i < segments.length; i++) {
+		const current = segments[i];
+		const next = segments[i + 1];
+		if (current.kind === 'removed' && next?.kind === 'added') {
+			const share = touchedShare(diffText(current.text, next.text));
+			if (share <= TEXT_REWRITE_THRESHOLD) {
+				out.push({ kind: 'changed', before: current.text, after: next.text });
+				i++;
+				continue;
+			}
+		}
+		out.push({ kind: current.kind, text: current.text });
+	}
+	return out;
+}
+
+function splitBlocks(source: string): string[] {
+	return source
+		.replace(/\r\n/g, '\n')
+		.split(/\n{2,}/)
+		.map((block) => block.trim())
+		.filter((block) => block !== '');
+}
+
+function markdown(source: string): string {
+	return marked.parse(source, { async: false }) as string;
+}
+
+// Word-level highlights inside one block: wrap changed runs in private-use
+// sentinels, render the markdown, then swap the sentinels for ins and del.
+const INS_OPEN = '\uE000';
+const INS_CLOSE = '\uE001';
+const DEL_OPEN = '\uE002';
+const DEL_CLOSE = '\uE003';
+
+function markdownWithHighlights(before: string, after: string): string {
+	const source = diffText(before, after)
+		.map((segment) => {
+			if (segment.kind === 'added') return `${INS_OPEN}${segment.text}${INS_CLOSE}`;
+			if (segment.kind === 'removed') return `${DEL_OPEN}${segment.text}${DEL_CLOSE}`;
+			return segment.text;
+		})
+		.join('');
+	return markdown(source)
+		.replaceAll(INS_OPEN, '<ins>')
+		.replaceAll(INS_CLOSE, '</ins>')
+		.replaceAll(DEL_OPEN, '<del>')
+		.replaceAll(DEL_CLOSE, '</del>');
+}
+
+/** Share of characters inside changed segments. */
+function touchedShare(segments: DiffSegment[]): number {
+	let touched = 0;
+	let total = 0;
+	for (const segment of segments) {
+		total += segment.text.length;
+		if (segment.kind !== 'same') touched += segment.text.length;
+	}
+	return total === 0 ? 0 : touched / total;
+}
+
+/**
+ * Diff text as words, whitespace runs and single punctuation marks, merged
+ * into runs. Prose diffs by word; a regex pattern (no whitespace, mostly
+ * punctuation) effectively diffs by character.
+ */
+export function diffText(before: string, after: string): DiffSegment[] {
+	const tokenize = (source: string): string[] => source.match(/\s+|\w+|[^\s\w]/gu) ?? [];
+	const tokens = diffSequences(tokenize(before), tokenize(after), 'chars');
+
+	// A removed run directly followed by an added run is a replaced span;
+	// re-diff it by character so an edit inside a word shows as that edit.
+	const out: DiffSegment[] = [];
+	for (let i = 0; i < tokens.length; i++) {
+		const current = tokens[i];
+		const next = tokens[i + 1];
+		if (current.kind === 'removed' && next?.kind === 'added') {
+			for (const segment of diffSequences([...current.text], [...next.text], 'chars')) {
+				const last = out.at(-1);
+				if (last && last.kind === segment.kind) last.text += segment.text;
+				else out.push({ ...segment });
+			}
+			i++;
+			continue;
+		}
+		const last = out.at(-1);
+		if (last && last.kind === current.kind) last.text += current.text;
+		else out.push({ ...current });
+	}
+	return out;
+}
+
 // --- Sequence diff (LCS) ---
 
-const MAX_CELLS = 4_000_000;
+// Roughly 64 MB of DP table. Beyond it the inputs are re-diffed as lines,
+// which is coarser but never degrades to "everything changed".
+const MAX_CELLS = 16_000_000;
 
 /**
  * Minimal edit script between two sequences. Line diffs keep one segment per
@@ -378,10 +568,40 @@ export function diffSequences(
 		else out.push({ kind, text });
 	};
 
-	if (a.length * b.length > MAX_CELLS) {
-		for (const text of a) push('removed', text);
-		for (const text of b) push('added', text);
+	// Common prefix and suffix cost nothing to detect and shrink the table;
+	// an append or a single edit then diffs in linear time.
+	let prefix = 0;
+	while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix++;
+	let suffix = 0;
+	while (
+		suffix < a.length - prefix &&
+		suffix < b.length - prefix &&
+		a[a.length - 1 - suffix] === b[b.length - 1 - suffix]
+	) {
+		suffix++;
+	}
+	if (prefix > 0 || suffix > 0) {
+		for (const text of a.slice(0, prefix)) push('same', text);
+		const middle = diffSequences(
+			a.slice(prefix, a.length - suffix),
+			b.slice(prefix, b.length - suffix),
+			mode
+		);
+		for (const segment of middle) push(segment.kind, segment.text);
+		for (const text of a.slice(a.length - suffix)) push('same', text);
 		return out;
+	}
+
+	if (a.length * b.length > MAX_CELLS) {
+		const lines = (tokens: string[]) => tokens.join('').split(/(?<=\n)/);
+		const lineA = lines(a);
+		const lineB = lines(b);
+		if (lineA.length * lineB.length > MAX_CELLS || lineA.length === a.length) {
+			for (const text of a) push('removed', text);
+			for (const text of b) push('added', text);
+			return out;
+		}
+		return diffSequences(lineA, lineB, mode);
 	}
 
 	// lcs[i][j] = LCS length of a[i..] and b[j..]

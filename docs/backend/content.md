@@ -37,12 +37,14 @@ The expanded diff is a list of one-line summaries, not raw fields.
 `src/lib/shared/utils/pcd/history-view.ts` has a presenter per change shape that matters (profile
 scoring, custom format conditions, regex patterns, profile qualities, tags, quality definition
 tiers, and scalar fields), each writing a sentence like "Release Group coffee added" with entity
-names as inline code, linked to their pages when they still exist. Long text fields (regex patterns,
-descriptions, naming formats) carry a character-level diff when the edit is small, and a
-side-by-side before and after when more than half the text changed, since a rewrite has nothing
-readable to diff. Shapes without a presenter fall back to a line diff of the changed subtree
-rendered as YAML, the same YAML the entity export view uses. Changes that display identically before
-and after (a tier max size moving between two unlimited values) are hidden.
+names as inline code, linked to their pages when they still exist. Plain text fields (regex
+patterns, naming formats) carry a word-level inline diff when the edit is small, and a side-by-side
+before and after when more than half the text changed, since a rewrite has nothing readable to diff.
+Markdown fields (descriptions) are diffed block by block and rendered as markdown: unchanged
+paragraphs render as they are, added and removed blocks are marked whole, and a paragraph edited in
+place gets word-level highlights. Shapes without a presenter fall back to a line diff of the changed
+subtree rendered as YAML, the same YAML the entity export view uses. Changes that display
+identically before and after (a tier max size moving between two unlimited values) are hidden.
 
 Seven entity types are browsable:
 

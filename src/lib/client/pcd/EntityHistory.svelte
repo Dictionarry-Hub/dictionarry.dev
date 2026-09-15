@@ -63,6 +63,20 @@
 	const diffBox =
 		'mt-1 rounded-control border border-border-subtle bg-surface px-3 py-2 font-mono text-xs leading-5';
 
+	const proseBox =
+		'prose rounded-control border border-border-subtle bg-surface px-3 py-2 text-sm';
+
+	// Word-level highlights inside an edited markdown block.
+	const proseDiff =
+		'[&_ins]:rounded-control-sm [&_ins]:bg-success-bg [&_ins]:text-success-text [&_ins]:no-underline [&_del]:rounded-control-sm [&_del]:bg-danger-bg [&_del]:text-danger-text';
+
+	const blockClass = {
+		same: '',
+		added: 'rounded-control bg-success-bg px-3 py-1',
+		removed: 'rounded-control bg-danger-bg px-3 py-1 line-through',
+		changed: 'border-l-2 border-border pl-3'
+	} as const;
+
 	const segmentClass = {
 		same: '',
 		added: 'bg-success-bg text-success-text',
@@ -128,6 +142,12 @@
 	{#each parts as part, index (index)}
 		{#if part.kind === 'text'}
 			{part.text}
+		{:else if part.href && part.external}
+			<a
+				href={part.href}
+				target="_blank"
+				rel="noopener noreferrer"
+				class="{inlineCode} text-link-text hover:underline">{part.text}</a>
 		{:else if part.href}
 			<a
 				href={part.href}
@@ -154,6 +174,30 @@
 					>{segment.text}</span
 				>{/each}
 		</p>
+	{:else if view.kind === 'markdown'}
+		<div class="{proseDiff} mt-1 space-y-2">
+			{#each view.blocks as block, index (index)}
+				<!-- eslint-disable-next-line svelte/no-at-html-tags -- markdown parsed at build time -->
+				<div class="prose text-sm {blockClass[block.kind]}">{@html block.html}</div>
+			{/each}
+		</div>
+	{:else if view.kind === 'markdown-replace'}
+		<div class="mt-1 grid gap-2 sm:grid-cols-2">
+			<div>
+				<p class="mb-1 text-xs text-text-muted">Before</p>
+				<div class="{proseBox} {view.beforeHtml === '' ? 'italic' : ''}">
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -- markdown parsed at build time -->
+					{@html view.beforeHtml || 'empty'}
+				</div>
+			</div>
+			<div>
+				<p class="mb-1 text-xs text-text-muted">After</p>
+				<div class="{proseBox} {view.afterHtml === '' ? 'italic' : ''}">
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -- markdown parsed at build time -->
+					{@html view.afterHtml || 'empty'}
+				</div>
+			</div>
+		</div>
 	{:else}
 		<div class="mt-1 grid gap-2 sm:grid-cols-2">
 			<div>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	diffSequences,
+	diffText,
 	presentChange,
 	type PresentContext,
 	type SummaryPart
@@ -199,27 +200,43 @@ describe('presentChange: other shapes', () => {
 		});
 	});
 
-	it('shows a rewritten description as before and after', () => {
+	it('links regex101 ids externally', () => {
 		const view = presentChange(
-			'custom_format',
+			'regular_expression',
+			{ path: 'regex101Id', kind: 'changed', from: 'i0Ngyx/1', to: 'i0Ngyx/2' },
+			ctx
+		);
+
+		expect(plain(view!.summary)).toBe('regex101 link updated to i0Ngyx/2');
+		expect(view!.summary.at(-1)).toEqual({
+			kind: 'ref',
+			text: 'i0Ngyx/2',
+			href: 'https://regex101.com/r/i0Ngyx/2',
+			external: true
+		});
+	});
+
+	it('renders an appended description paragraph as one added markdown block', () => {
+		const before = 'Matches **3D** tags.\n\n- Word boundaries apply.';
+		const view = presentChange(
+			'regular_expression',
 			{
 				path: 'description',
 				kind: 'changed',
-				from: 'Matches releases from the old group list.',
-				to: 'Completely different wording about tiers.'
+				from: before,
+				to: `${before}\n\n- A year lookbehind.`
 			},
 			ctx
 		);
 
-		expect(plain(view!.summary)).toBe('Description changed');
-		expect(view!.detail).toEqual({
-			kind: 'replace',
-			before: 'Matches releases from the old group list.',
-			after: 'Completely different wording about tiers.'
-		});
+		expect(view!.detail?.kind).toBe('markdown');
+		const blocks = view!.detail?.kind === 'markdown' ? view!.detail.blocks : [];
+		expect(blocks.map((block) => block.kind)).toEqual(['same', 'same', 'added']);
+		expect(blocks[0].html).toContain('<strong>3D</strong>');
+		expect(blocks[2].html).toContain('<li>A year lookbehind.</li>');
 	});
 
-	it('shows a lightly edited description as an inline diff', () => {
+	it('highlights words inside an edited markdown paragraph', () => {
 		const view = presentChange(
 			'custom_format',
 			{
@@ -231,7 +248,66 @@ describe('presentChange: other shapes', () => {
 			ctx
 		);
 
+		const blocks = view!.detail?.kind === 'markdown' ? view!.detail.blocks : [];
+		expect(blocks.map((block) => block.kind)).toEqual(['changed']);
+		expect(blocks[0].html).toContain('<ins>banned </ins>');
+	});
+
+	it('diffs long prose by word without giving up', () => {
+		const before = 'word '.repeat(3000).trim();
+		const segments = diffText(before, `${before} extra`);
+
+		expect(segments.filter((segment) => segment.kind !== 'same')).toEqual([
+			{ kind: 'added', text: ' extra' }
+		]);
+	});
+
+	it('shows a rewritten plain text field as before and after', () => {
+		const view = presentChange(
+			'sonarr_naming',
+			{
+				path: 'formats.standardEpisodeFormat',
+				kind: 'changed',
+				from: '{Series Title} - S{season:00}E{episode:00} - {Episode Title}',
+				to: '{Release Group} {Quality Full} {MediaInfo VideoCodec} [{Custom Formats}]'
+			},
+			ctx
+		);
+
+		expect(view!.detail?.kind).toBe('replace');
+	});
+
+	it('shows a lightly edited plain text field as an inline diff', () => {
+		const view = presentChange(
+			'sonarr_naming',
+			{
+				path: 'formats.standardEpisodeFormat',
+				kind: 'changed',
+				from: '{Series Title} - S{season:00}E{episode:00} - {Episode Title}',
+				to: '{Series Title} - S{season:00}E{episode:00} - {Episode CleanTitle}'
+			},
+			ctx
+		);
+
 		expect(view!.detail?.kind).toBe('chars');
+	});
+
+	it('shows a rewritten description as rendered before and after', () => {
+		const view = presentChange(
+			'custom_format',
+			{
+				path: 'description',
+				kind: 'changed',
+				from: 'Matches releases from the old group list.',
+				to: 'Completely different wording about *tiers*.'
+			},
+			ctx
+		);
+
+		expect(view!.detail?.kind).toBe('markdown-replace');
+		expect(view!.detail?.kind === 'markdown-replace' ? view!.detail.afterHtml : '').toContain(
+			'<em>tiers</em>'
+		);
 	});
 
 	it('shows an added description as after only', () => {
@@ -241,7 +317,11 @@ describe('presentChange: other shapes', () => {
 			ctx
 		);
 
-		expect(view!.detail).toEqual({ kind: 'replace', before: '', after: 'New text' });
+		expect(view!.detail).toEqual({
+			kind: 'markdown-replace',
+			beforeHtml: '',
+			afterHtml: '<p>New text</p>\n'
+		});
 	});
 
 	it('reports tags that joined and left', () => {
@@ -251,7 +331,10 @@ describe('presentChange: other shapes', () => {
 			ctx
 		);
 
-		expect(plain(view!.summary)).toBe('Tags: added C, D; removed A');
+		expect(plain(view!.summary)).toBe('Tags added C, D; removed A');
+		expect(
+			view!.summary.filter((part) => part.kind === 'ref').map((part) => part.text)
+		).toEqual(['C', 'D', 'A']);
 	});
 
 	it('summarises quality entries and positions', () => {
