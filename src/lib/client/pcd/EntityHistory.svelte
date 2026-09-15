@@ -150,7 +150,7 @@
 	{#if item.related.length > 0}
 		<div class="mt-4">
 			<p class="mb-1 text-sm text-text-muted">Also changed in this commit</p>
-			<ul class="flex flex-wrap gap-x-4 gap-y-1">
+			<ul class="list-disc space-y-1 pl-5">
 				{#each item.related as link (link.href)}
 					<li>
 						<a
