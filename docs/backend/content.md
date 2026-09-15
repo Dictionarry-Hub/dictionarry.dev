@@ -28,12 +28,10 @@ Custom format pages also list the quality profiles that score them. References r
 application-specific scoring into effective Radarr and Sonarr scores and appear in both HTML and
 Markdown representations.
 
-Every detail page except quality profiles ends with a History section: one row per commit that
-touched the entity (commit link, change title, date), expandable to the field-level diff and links
-to the other entities changed in the same commit. History is compiled from the PCD repo's op log by
-the pipeline (see [tooling/pcd.md](../tooling/pcd.md#history)); the section is empty when the
-pipeline ran with `--no-history`. Below the `lg` breakpoint the rows render as cards with a change
-count instead of the expandable diff.
+Every detail page ends with a History section: one row per commit that touched the entity (commit
+link, change title, date), expandable to the field-level diff and links to the other entities
+changed in the same commit. History is compiled from the PCD repo's op log by the pipeline (see
+[tooling/pcd.md](../tooling/pcd.md#history)) and appears in both HTML and Markdown representations.
 
 Seven entity types are browsable:
 
