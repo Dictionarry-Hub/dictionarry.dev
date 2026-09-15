@@ -1,5 +1,20 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import {
+		BookOpen,
+		CalendarDays,
+		Flag,
+		HardDrive,
+		Languages,
+		Monitor,
+		Radio,
+		Regex,
+		ScanText,
+		SlidersHorizontal,
+		Tags,
+		Users
+	} from '@lucide/svelte';
+	import type { Component } from 'svelte';
 	import EntityView from '$lib/client/pcd/EntityView.svelte';
 	import AdaptiveList from '$lib/client/ui/adaptive-list/AdaptiveList.svelte';
 	import Badge from '$lib/client/ui/badge/Badge.svelte';
@@ -8,12 +23,12 @@
 	import PageHeader from '$lib/client/ui/header/PageHeader.svelte';
 	import type { Column } from '$lib/client/ui/table/types';
 	import SEO from '$lib/client/ui/utils/SEO.svelte';
-	import { formatConditionValue } from '$lib/shared/utils/pcd/format';
+	import { formatConditionType, formatConditionValue } from '$lib/shared/utils/pcd/format';
 	import {
 		formatProfileScore,
 		type QualityProfileReference
 	} from '$lib/shared/utils/pcd/references';
-	import ConditionCard from './ConditionCard.svelte';
+	import type { ConditionType } from '$lib/types/pcd';
 
 	let { data } = $props();
 	const format = $derived(data.format);
@@ -22,6 +37,57 @@
 	const referenceColumns: Column<QualityProfileReference>[] = [
 		{ key: 'name', header: 'Quality Profile', sortable: true },
 		{ key: 'scores', header: 'Score' }
+	];
+
+	interface ConditionRow {
+		[key: string]: unknown;
+		name: string;
+		type: ConditionType;
+		typeLabel: string;
+		value: string;
+		regularExpressionHref: string | undefined;
+		radarr: boolean;
+		sonarr: boolean;
+		required: boolean;
+		negated: boolean;
+	}
+
+	const conditionIcons: Record<ConditionType, Component> = {
+		release_title: ScanText,
+		release_group: Users,
+		edition: BookOpen,
+		language: Languages,
+		source: Radio,
+		resolution: Monitor,
+		quality_modifier: SlidersHorizontal,
+		release_type: Tags,
+		indexer_flag: Flag,
+		size: HardDrive,
+		year: CalendarDays
+	};
+
+	const conditionRows = $derived.by((): ConditionRow[] =>
+		format.conditions.map((condition) => ({
+			name: condition.name,
+			type: condition.type,
+			typeLabel: formatConditionType(condition.type),
+			value: formatConditionValue(condition.data),
+			regularExpressionHref: condition.regularExpressionSlug
+				? `/pcd/${page.params.database}/regular-expressions/${condition.regularExpressionSlug}`
+				: undefined,
+			radarr: condition.arrType === 'all' || condition.arrType === 'radarr',
+			sonarr: condition.arrType === 'all' || condition.arrType === 'sonarr',
+			required: condition.required,
+			negated: condition.negate
+		}))
+	);
+
+	const conditionColumns: Column<ConditionRow>[] = [
+		{ key: 'name', header: 'Name', sortable: true },
+		{ key: 'typeLabel', header: 'Type', sortable: true },
+		{ key: 'value', header: 'Value' },
+		{ key: 'radarr', header: 'Applies to' },
+		{ key: 'required', header: 'Flags' }
 	];
 
 	function scoreClass(score: number): string {
@@ -48,6 +114,64 @@
 		];
 	});
 </script>
+
+{#snippet conditionType(row: ConditionRow)}
+	{@const TypeIcon = conditionIcons[row.type]}
+	<span class="inline-flex items-center gap-1.5 text-text-muted">
+		<TypeIcon
+			size={16}
+			aria-hidden="true" />
+		<span>{row.typeLabel}</span>
+	</span>
+{/snippet}
+
+{#snippet conditionValue(row: ConditionRow)}
+	{#if row.regularExpressionHref}
+		<a
+			href={row.regularExpressionHref}
+			aria-label="View regular expression: {row.value}"
+			class="inline-flex items-center gap-1.5 rounded-control-sm font-medium text-link-text underline decoration-transparent underline-offset-4 transition-colors hover:decoration-current focus-visible:decoration-current focus-visible:ring-2 focus-visible:ring-accent-border focus-visible:outline-none">
+			<Regex
+				size={16}
+				aria-hidden="true" />
+			<span>{row.value}</span>
+		</a>
+	{:else}
+		<span class="font-medium">{row.value}</span>
+	{/if}
+{/snippet}
+
+{#snippet conditionApps(row: ConditionRow)}
+	<span class="inline-flex items-center gap-2">
+		{#if row.radarr}
+			<img
+				src="/radarr.svg"
+				alt="Radarr"
+				class="size-5" />
+		{/if}
+		{#if row.sonarr}
+			<img
+				src="/sonarr.svg"
+				alt="Sonarr"
+				class="size-5" />
+		{/if}
+	</span>
+{/snippet}
+
+{#snippet conditionFlags(row: ConditionRow)}
+	<span class="inline-flex flex-wrap gap-2">
+		<Badge
+			color={row.required ? 'info' : 'neutral'}
+			variant="solid">
+			{row.required ? 'Required' : 'Optional'}
+		</Badge>
+		{#if row.negated}
+			<Badge
+				color="danger"
+				variant="solid">Negated</Badge>
+		{/if}
+	</span>
+{/snippet}
 
 {#snippet scoreValue(score: number)}
 	<span class="text-sm font-medium tabular-nums {scoreClass(score)}">
@@ -139,20 +263,41 @@
 				class="mt-8 border-b border-border-muted pb-2 text-xl font-bold">
 				Conditions
 			</h2>
-			{#if format.conditions.length > 0}
-				<div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-					{#each format.conditions as condition, index (index)}
-						<ConditionCard
-							name={condition.name}
-							type={condition.type}
-							value={formatConditionValue(condition.data)}
-							regularExpressionHref={condition.regularExpressionSlug
-								? `/pcd/${page.params.database}/regular-expressions/${condition.regularExpressionSlug}`
-								: undefined}
-							arrType={condition.arrType}
-							required={condition.required}
-							negated={condition.negate} />
-					{/each}
+			{#if conditionRows.length > 0}
+				<div class="mt-4">
+					<AdaptiveList
+						data={conditionRows}
+						columns={conditionColumns}>
+						{#snippet cell(row, column)}
+							{#if column.key === 'name'}
+								<span class="font-medium">{row.name}</span>
+							{:else if column.key === 'typeLabel'}
+								{@render conditionType(row)}
+							{:else if column.key === 'value'}
+								{@render conditionValue(row)}
+							{:else if column.key === 'radarr'}
+								{@render conditionApps(row)}
+							{:else if column.key === 'required'}
+								{@render conditionFlags(row)}
+							{/if}
+						{/snippet}
+						{#snippet card(row)}
+							<div class="flex items-start justify-between gap-3">
+								<p class="text-sm font-medium">{row.name}</p>
+								{@render conditionType(row)}
+							</div>
+							<dl
+								class="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
+								<dt class="text-text-muted">
+									{row.regularExpressionHref ? 'Regular expression' : 'Value'}
+								</dt>
+								<dd class="min-w-0 break-words">{@render conditionValue(row)}</dd>
+								<dt class="text-text-muted">Applies to</dt>
+								<dd>{@render conditionApps(row)}</dd>
+							</dl>
+							<div class="mt-3">{@render conditionFlags(row)}</div>
+						{/snippet}
+					</AdaptiveList>
 				</div>
 			{:else}
 				<p class="mt-4 text-sm text-text-muted italic">No conditions.</p>
