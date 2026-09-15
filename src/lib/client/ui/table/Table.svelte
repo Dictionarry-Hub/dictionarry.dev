@@ -59,6 +59,13 @@
 		});
 	});
 
+	// New data means new rows: nothing stays open across a navigation that
+	// reuses this component, and the expandable probe is rebuilt from scratch.
+	$effect(() => {
+		void data;
+		expandedRows.clear();
+	});
+
 	$effect(() => {
 		const _rows = sorted;
 		if (!probeContainer) return;
@@ -179,7 +186,7 @@
 						</td>
 					{/if}
 				</tr>
-				{#if expanded && expandedRows.has(idx)}
+				{#if expanded && expandedRows.has(idx) && expandableSet.has(idx)}
 					<tr class="border-b border-border-subtle last:border-b-0">
 						<td
 							colspan={colCount}
