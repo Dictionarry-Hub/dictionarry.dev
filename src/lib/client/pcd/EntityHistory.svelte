@@ -57,6 +57,9 @@
 		updated: 'info'
 	};
 
+	const inlineCode =
+		'rounded-control-sm border border-border px-1.5 py-0.5 font-mono text-[0.875em]';
+
 	const segmentClass = {
 		same: '',
 		added: 'bg-success-bg text-success-text',
@@ -117,6 +120,7 @@
 	{/if}
 {/snippet}
 
+<!-- Entity names render like prose inline code (src/styles/prose.css). -->
 {#snippet summary(parts: SummaryPart[])}
 	{#each parts as part, index (index)}
 		{#if part.kind === 'text'}
@@ -124,9 +128,9 @@
 		{:else if part.href}
 			<a
 				href={part.href}
-				class="font-mono text-link-text hover:underline">{part.text}</a>
+				class="{inlineCode} text-link-text hover:underline">{part.text}</a>
 		{:else}
-			<span class="font-mono">{part.text}</span>
+			<span class="{inlineCode} text-text-soft">{part.text}</span>
 		{/if}
 	{/each}
 {/snippet}
@@ -165,7 +169,7 @@
 	{#if item.kind === 'renamed'}
 		<p class="text-sm">
 			<span class="text-text-muted">Renamed from</span>
-			<span class="font-mono">{item.renamedFrom}</span>
+			<span class="{inlineCode} text-text-soft">{item.renamedFrom}</span>
 		</p>
 	{/if}
 	{#if item.changes.length > 0}
