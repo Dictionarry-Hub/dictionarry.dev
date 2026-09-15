@@ -199,6 +199,51 @@ describe('presentChange: other shapes', () => {
 		});
 	});
 
+	it('shows a rewritten description as before and after', () => {
+		const view = presentChange(
+			'custom_format',
+			{
+				path: 'description',
+				kind: 'changed',
+				from: 'Matches releases from the old group list.',
+				to: 'Completely different wording about tiers.'
+			},
+			ctx
+		);
+
+		expect(plain(view!.summary)).toBe('Description changed');
+		expect(view!.detail).toEqual({
+			kind: 'replace',
+			before: 'Matches releases from the old group list.',
+			after: 'Completely different wording about tiers.'
+		});
+	});
+
+	it('shows a lightly edited description as an inline diff', () => {
+		const view = presentChange(
+			'custom_format',
+			{
+				path: 'description',
+				kind: 'changed',
+				from: 'Matches releases from the group list.',
+				to: 'Matches releases from the banned group list.'
+			},
+			ctx
+		);
+
+		expect(view!.detail?.kind).toBe('chars');
+	});
+
+	it('shows an added description as after only', () => {
+		const view = presentChange(
+			'custom_format',
+			{ path: 'description', kind: 'changed', from: null, to: 'New text' },
+			ctx
+		);
+
+		expect(view!.detail).toEqual({ kind: 'replace', before: '', after: 'New text' });
+	});
+
 	it('reports tags that joined and left', () => {
 		const view = presentChange(
 			'custom_format',

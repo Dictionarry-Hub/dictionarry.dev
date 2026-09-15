@@ -27,7 +27,16 @@ export interface DiffSegment {
 }
 
 export type ChangeDetail =
-	{ kind: 'lines'; lines: DiffSegment[] } | { kind: 'chars'; segments: DiffSegment[] };
+	| { kind: 'lines'; lines: DiffSegment[] }
+	| { kind: 'chars'; segments: DiffSegment[] }
+	| { kind: 'replace'; before: string; after: string };
+
+/**
+ * Share of characters touched above which a text change is shown as before
+ * and after instead of an inline diff: past this point it is a rewrite, and
+ * a rewrite has nothing readable to diff.
+ */
+export const TEXT_REWRITE_THRESHOLD = 0.5;
 
 export interface ChangeView {
 	summary: SummaryPart[];
@@ -66,10 +75,10 @@ export function presentChange(
 		return presentCondition(change, head.item, path.slice(1), ctx);
 	}
 	if (head?.key === 'pattern' && path.length === 1) {
-		return withCharDiff([text('Pattern changed')], change);
+		return presentText([text('Pattern changed')], change);
 	}
 	if (head?.key === 'description' && path.length === 1) {
-		return withLineDiff([text(`Description ${verb(change)}`)], change);
+		return presentText([text(`Description ${verb(change)}`)], change);
 	}
 	if (head?.key === 'tags' && path.length === 1) {
 		return presentSet('Tags', change);
@@ -305,7 +314,7 @@ function presentScalar(label: string, change: EntityChange): ChangeView {
 	if (change.kind === 'removed') return { summary: [text(`${label} removed`)] };
 	if (typeof change.from === 'string' && typeof change.to === 'string') {
 		if (change.from.length > 40 || change.to.length > 40) {
-			return withCharDiff([text(`${label} changed`)], change);
+			return presentText([text(`${label} changed`)], change);
 		}
 	}
 	return { summary: [text(`${label} ${scalar(change.from)} to ${scalar(change.to)}`)] };
@@ -329,10 +338,24 @@ function withLineDiff(summary: SummaryPart[], change: EntityChange, yaml = false
 	return { summary, detail: { kind: 'lines', lines } };
 }
 
-function withCharDiff(summary: SummaryPart[], change: EntityChange): ChangeView {
-	const from = typeof change.from === 'string' ? [...change.from] : [];
-	const to = typeof change.to === 'string' ? [...change.to] : [];
-	return { summary, detail: { kind: 'chars', segments: diffSequences(from, to, 'chars') } };
+/**
+ * Long text fields (patterns, descriptions, naming formats). A small edit
+ * shows as an inline character diff; a rewrite shows before and after.
+ */
+function presentText(summary: SummaryPart[], change: EntityChange): ChangeView {
+	const before = typeof change.from === 'string' ? change.from : '';
+	const after = typeof change.to === 'string' ? change.to : '';
+	if (before === '' || after === '') {
+		return { summary, detail: { kind: 'replace', before, after } };
+	}
+	const segments = diffSequences([...before], [...after], 'chars');
+	const touched = segments
+		.filter((segment) => segment.kind !== 'same')
+		.reduce((n, segment) => n + segment.text.length, 0);
+	if (touched / (before.length + after.length) > TEXT_REWRITE_THRESHOLD) {
+		return { summary, detail: { kind: 'replace', before, after } };
+	}
+	return { summary, detail: { kind: 'chars', segments } };
 }
 
 // --- Sequence diff (LCS) ---

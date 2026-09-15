@@ -60,6 +60,9 @@
 	const inlineCode =
 		'rounded-control-sm border border-border px-1.5 py-0.5 font-mono text-[0.875em]';
 
+	const diffBox =
+		'mt-1 rounded-control border border-border-subtle bg-surface px-3 py-2 font-mono text-xs leading-5';
+
 	const segmentClass = {
 		same: '',
 		added: 'bg-success-bg text-success-text',
@@ -137,8 +140,7 @@
 
 {#snippet detail(view: ChangeDetail)}
 	{#if view.kind === 'lines'}
-		<pre
-			class="mt-1 overflow-x-auto rounded-control border border-border-subtle bg-surface px-3 py-2 font-mono text-xs leading-5">{#each view.lines as line, index (index)}<span
+		<pre class="{diffBox} whitespace-pre-wrap">{#each view.lines as line, index (index)}<span
 					class="block {segmentClass[line.kind]}"
 					>{line.kind === 'added'
 						? '+'
@@ -146,13 +148,29 @@
 							? '-'
 							: ' '} {line.text}</span
 				>{/each}</pre>
-	{:else}
-		<p
-			class="mt-1 rounded-control border border-border-subtle bg-surface px-3 py-2 font-mono text-xs leading-5 break-all">
+	{:else if view.kind === 'chars'}
+		<p class="{diffBox} break-all whitespace-pre-wrap">
 			{#each view.segments as segment, index (index)}<span class={segmentClass[segment.kind]}
 					>{segment.text}</span
 				>{/each}
 		</p>
+	{:else}
+		<div class="mt-1 grid gap-2 sm:grid-cols-2">
+			<div>
+				<p class="mb-1 text-xs text-text-muted">Before</p>
+				<pre
+					class="{diffBox} mt-0 break-words whitespace-pre-wrap {view.before === ''
+						? 'italic'
+						: ''}">{view.before === '' ? 'empty' : view.before}</pre>
+			</div>
+			<div>
+				<p class="mb-1 text-xs text-text-muted">After</p>
+				<pre
+					class="{diffBox} mt-0 break-words whitespace-pre-wrap {view.after === ''
+						? 'italic'
+						: ''}">{view.after === '' ? 'empty' : view.after}</pre>
+			</div>
+		</div>
 	{/if}
 {/snippet}
 
