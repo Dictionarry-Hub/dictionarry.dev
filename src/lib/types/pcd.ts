@@ -217,6 +217,28 @@ export interface QualityDefinitionTier {
 	preferredSize: number;
 }
 
+// --- Navigation ---
+// Entity names per database, written to src/lib/data/pcd/index.json by the
+// pipeline. Drives prerender entries and the sidebar (fetched per database
+// at view time from /pcd/{database}/nav.json).
+
+export interface PcdNavEntry {
+	name: string;
+	arrType: string;
+}
+
+export interface PcdNavDatabase {
+	customFormats: string[];
+	qualityProfiles: string[];
+	regularExpressions: string[];
+	delayProfiles: string[];
+	naming: PcdNavEntry[];
+	mediaSettings: PcdNavEntry[];
+	qualityDefinitions: PcdNavEntry[];
+}
+
+export type PcdNavIndex = Record<string, PcdNavDatabase>;
+
 // --- History ---
 // Produced by the pipeline's history replay (tooling/pcd/history.ts) and
 // written to src/lib/data/pcd/{id}.history.json.

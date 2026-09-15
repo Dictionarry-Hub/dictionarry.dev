@@ -105,8 +105,11 @@ The pipeline outputs three things:
 1. **Per-database JSON** (`src/lib/data/pcd/{id}.json`) containing full entity data, typed as
    `CompiledDatabase` from `src/lib/types/pcd.ts`. Consumed by `+page.server.ts` load functions.
 
-2. **Nav index** (`src/lib/data/pcd/index.json`) containing entity names per database. Consumed by
-   `+layout.server.ts` to populate the sidebar navigation.
+2. **Nav index** (`src/lib/data/pcd/index.json`) containing entity names per database. Drives the
+   prerender entries and is served per database as `/pcd/{database}/nav.json`, which the root layout
+   fetches at view time to fill the sidebar. The prerendered HTML carries only the seven group
+   links, not the entity names: the index is navigation, not content, and baking it into every page
+   cost about 55 KB per page across 4,500 pages.
 
 3. **Per-database history** (`src/lib/data/pcd/history/{id}.json`) containing each entity's change
    log. Consumed by `src/lib/shared/utils/pcd/history-data.ts` for the detail pages and markdown

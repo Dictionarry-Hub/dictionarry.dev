@@ -30,6 +30,8 @@
 	import SearchTrigger from '$lib/client/ui/search/SearchTrigger.svelte';
 	import TableOfContents from '$lib/client/ui/toc/TableOfContents.svelte';
 	import { slugify } from '$lib/shared/utils/slug';
+	import { loadPcdNav } from '$lib/client/pcd/nav';
+	import type { PcdNavDatabase } from '$lib/types/pcd';
 
 	const themeOptions = THEME_DEFINITIONS.map((d) => ({
 		value: d.id,
@@ -58,7 +60,26 @@
 	let searchOpen = $state(false);
 	let mounted = $state(false);
 
-	const currentNav = $derived(data.pcdNav[databaseValue]);
+	const hasPcd = $derived(data.pcdDatabases.includes(databaseValue));
+
+	// Sidebar entity names arrive after mount, one request per database. The
+	// prerendered HTML has the seven group links but no entity names.
+	let currentNav = $state<PcdNavDatabase | null>(null);
+	$effect(() => {
+		const id = databaseValue;
+		if (!mounted || !data.pcdDatabases.includes(id)) {
+			currentNav = null;
+			return;
+		}
+		void loadPcdNav(id).then(
+			(nav) => {
+				if (databaseValue === id) currentNav = nav;
+			},
+			() => {
+				if (databaseValue === id) currentNav = null;
+			}
+		);
+	});
 	const yamlView = $derived(mounted && page.url.searchParams.get('view') === 'yaml');
 	// PCD pages are tables and diffs, not prose, so they get a wider column.
 	const wideContent = $derived(database.isPcdRoute(page.url.pathname));
@@ -122,7 +143,7 @@
 
 		<!-- PCD reference: the whole subtree is scoped to one database, so the
 		     database picker is its root. -->
-		{#if currentNav}
+		{#if hasPcd}
 			<NavGroupSelect
 				bind:value={databaseValue}
 				options={databaseOptions}
@@ -134,7 +155,7 @@
 					icon={SlidersHorizontal}
 					open={false}
 					class="mb-1">
-					{#each currentNav.qualityProfiles as name (name)}
+					{#each currentNav?.qualityProfiles ?? [] as name (name)}
 						<NavItem
 							label={name}
 							href="/pcd/{databaseValue}/quality-profiles/{slugify(name)}" />
@@ -147,7 +168,7 @@
 					icon={Tags}
 					open={false}
 					class="mb-1">
-					{#each currentNav.customFormats as name (name)}
+					{#each currentNav?.customFormats ?? [] as name (name)}
 						<NavItem
 							label={name}
 							href="/pcd/{databaseValue}/custom-formats/{slugify(name)}" />
@@ -160,7 +181,7 @@
 					icon={Regex}
 					open={false}
 					class="mb-1">
-					{#each currentNav.regularExpressions as name (name)}
+					{#each currentNav?.regularExpressions ?? [] as name (name)}
 						<NavItem
 							label={name}
 							href="/pcd/{databaseValue}/regular-expressions/{slugify(name)}" />
@@ -173,7 +194,7 @@
 					icon={Clock}
 					open={false}
 					class="mb-1">
-					{#each currentNav.delayProfiles as name (name)}
+					{#each currentNav?.delayProfiles ?? [] as name (name)}
 						<NavItem
 							label={name}
 							href="/pcd/{databaseValue}/delay-profiles/{slugify(name)}" />
@@ -186,7 +207,7 @@
 					icon={FileText}
 					open={false}
 					class="mb-1">
-					{#each currentNav.naming as entry (`${entry.arrType}/${entry.name}`)}
+					{#each currentNav?.naming ?? [] as entry (`${entry.arrType}/${entry.name}`)}
 						<NavItem
 							label={entry.name}
 							image="/{entry.arrType}.svg"
@@ -202,7 +223,7 @@
 					icon={Settings}
 					open={false}
 					class="mb-1">
-					{#each currentNav.mediaSettings as entry (`${entry.arrType}/${entry.name}`)}
+					{#each currentNav?.mediaSettings ?? [] as entry (`${entry.arrType}/${entry.name}`)}
 						<NavItem
 							label={entry.name}
 							image="/{entry.arrType}.svg"
@@ -218,7 +239,7 @@
 					icon={Ruler}
 					open={false}
 					class="mb-1">
-					{#each currentNav.qualityDefinitions as entry (`${entry.arrType}/${entry.name}`)}
+					{#each currentNav?.qualityDefinitions ?? [] as entry (`${entry.arrType}/${entry.name}`)}
 						<NavItem
 							label={entry.name}
 							image="/{entry.arrType}.svg"
