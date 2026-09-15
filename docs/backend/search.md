@@ -3,8 +3,8 @@
 Design for the search system: a hand-rolled fuzzy scorer blended with Elo ratings derived from click
 behavior. Fully implemented except production deployment of the click store (Worker, D1, cron).
 
-Elo ranking is controlled at build time by `PUBLIC_SEARCH_ELO_ENABLED`. It defaults to `false`.
-When disabled, query results use text scores only, the popular empty state is hidden, and per-term
+Elo ranking is controlled at build time by `PUBLIC_SEARCH_ELO_ENABLED`. It defaults to `false`. When
+disabled, query results use text scores only, the popular empty state is hidden, and per-term
 ratings are not loaded. Set it to `true` before starting the development server or production build
 to enable Elo ranking. Click recording remains enabled in both modes.
 
