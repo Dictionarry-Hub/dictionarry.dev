@@ -1,43 +1,18 @@
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-	fetchRepo,
-	fetchSchema,
-	resolveSchemaVersion,
-	getOpsDir,
-	opFileCommits,
-	cleanupTempDirs
-} from './fetch.js';
-import { compileDatabase, createDatabase } from './build.js';
-import { extractDatabase } from './extract.js';
-import { replayWithHistory } from './replay.js';
-import type { EntityHistory } from './history.js';
+import { Worker } from 'node:worker_threads';
+import { cleanupTempDirs } from './fetch.js';
+import type { CompileOptions, CompileResult, NavDatabase, NavEntry } from './compile.js';
 import { slugify } from '../../src/lib/shared/utils/slug.js';
-import type { PcdConfig, PcdManifest } from './types.js';
-import type { CompiledDatabase } from '../../src/lib/types/pcd.js';
+import type { PcdConfig, DatabaseEntry } from './types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '../..');
 const outputDir = join(projectRoot, 'src/lib/data/pcd');
-const historyDir = join(outputDir, 'history');
 
-interface NavEntry {
-	name: string;
-	arrType: string;
-}
-
-interface NavIndex {
-	[databaseId: string]: {
-		customFormats: string[];
-		qualityProfiles: string[];
-		regularExpressions: string[];
-		delayProfiles: string[];
-		naming: NavEntry[];
-		mediaSettings: NavEntry[];
-		qualityDefinitions: NavEntry[];
-	};
-}
+type NavIndex = Record<string, NavDatabase>;
 
 interface SlugCollision {
 	database: string;
@@ -83,98 +58,67 @@ function checkSlugCollisions(navIndex: NavIndex): SlugCollision[] {
 	return collisions;
 }
 
+// Each database compiles in its own worker thread (better-sqlite3 is
+// synchronous). The worker file resolves relative to this one so it works
+// under tsx, which registers its loader for worker threads too.
+function compileInWorker(entry: DatabaseEntry, options: CompileOptions): Promise<CompileResult> {
+	return new Promise((resolve, reject) => {
+		const worker = new Worker(new URL('./worker.ts', import.meta.url), {
+			workerData: { entry, options }
+		});
+		worker.once('message', (result: CompileResult) => resolve(result));
+		worker.once('error', reject);
+		worker.once('exit', (code) => {
+			if (code !== 0) reject(new Error(`${entry.name}: worker exited with code ${code}`));
+		});
+	});
+}
+
+/** Run tasks with at most `limit` in flight, preserving input order in the result. */
+async function inParallel<T, R>(
+	items: T[],
+	limit: number,
+	run: (item: T) => Promise<R>
+): Promise<R[]> {
+	const results: R[] = new Array(items.length);
+	let next = 0;
+	const lanes = Array.from({ length: Math.min(limit, items.length) }, async () => {
+		while (next < items.length) {
+			const index = next++;
+			results[index] = await run(items[index]);
+		}
+	});
+	await Promise.all(lanes);
+	return results;
+}
+
 // Usage:
 //   pnpm compile:pcd                 compile entities and per-entity history
 //   pnpm compile:pcd -- --no-history compile entities only
-function main(): void {
+async function main(): Promise<void> {
 	const withHistory = !process.argv.includes('--no-history');
 	const config: PcdConfig = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf-8'));
 
 	mkdirSync(outputDir, { recursive: true });
 
+	const parallelism = Math.min(availableParallelism(), config.databases.length);
 	console.log(
-		`Compiling ${config.databases.length} PCD databases${withHistory ? ' with history' : ''}...\n`
+		`Compiling ${config.databases.length} PCD databases${withHistory ? ' with history' : ''} (${parallelism} at a time)...\n`
 	);
 
-	const navIndex: NavIndex = {};
-
-	for (const entry of config.databases) {
-		const start = performance.now();
-		console.log(`  ${entry.name} (${entry.repo}@${entry.branch})`);
-
-		// Fetch database repo
-		const repoPath = fetchRepo(entry.repo, entry.branch);
-		const manifest: PcdManifest = JSON.parse(readFileSync(join(repoPath, 'pcd.json'), 'utf-8'));
-
-		// Resolve and fetch schema
-		const { repo: schemaRepo, version: schemaVersion } = resolveSchemaVersion(manifest);
-		const schemaPath = fetchSchema(schemaRepo, schemaVersion);
-
-		// Compile: schema ops then base ops. With history on, base ops replay
-		// one file at a time and the entity state comes out of the same pass.
-		const schemaOpsDir = getOpsDir(schemaPath);
-		const baseOpsDir = getOpsDir(repoPath);
-		let compiled: CompiledDatabase;
-		let history: EntityHistory | null = null;
-
-		if (withHistory) {
-			const db = createDatabase(schemaOpsDir);
-			const commits = opFileCommits(repoPath);
-			const result = replayWithHistory(
-				db,
-				baseOpsDir,
-				commits,
-				entry,
-				manifest,
-				schemaVersion
-			);
-			db.close();
-			compiled = result.compiled;
-			history = result.history;
-		} else {
-			const db = compileDatabase(schemaOpsDir, baseOpsDir);
-			compiled = extractDatabase(db, entry, manifest, schemaVersion);
-			db.close();
-		}
-
-		writeFileSync(join(outputDir, `${entry.id}.json`), JSON.stringify(compiled, null, 2));
-		if (history !== null) {
-			// Own folder so the routes' `pcd/*.json` database globs never see it.
-			mkdirSync(historyDir, { recursive: true });
-			writeFileSync(join(historyDir, `${entry.id}.json`), JSON.stringify(history));
-		}
-
-		// Collect nav data
-		const mediaEntries = (arrType: 'radarr' | 'sonarr') => ({
-			naming: compiled.media[arrType].naming.map((n) => ({ name: n.name, arrType })),
-			settings: compiled.media[arrType].settings.map((s) => ({ name: s.name, arrType })),
-			qualityDefs: compiled.media[arrType].qualityDefinitions.map((q) => ({
-				name: q.name,
-				arrType
-			}))
-		});
-		const radarr = mediaEntries('radarr');
-		const sonarr = mediaEntries('sonarr');
-
-		navIndex[entry.id] = {
-			customFormats: compiled.customFormats.map((cf) => cf.name),
-			qualityProfiles: compiled.qualityProfiles.map((qp) => qp.name),
-			regularExpressions: compiled.regularExpressions.map((re) => re.name),
-			delayProfiles: compiled.delayProfiles.map((dp) => dp.name),
-			naming: [...radarr.naming, ...sonarr.naming],
-			mediaSettings: [...radarr.settings, ...sonarr.settings],
-			qualityDefinitions: [...radarr.qualityDefs, ...sonarr.qualityDefs]
-		};
-
-		const elapsed = (performance.now() - start).toFixed(0);
-		const historyCount =
-			history === null
-				? ''
-				: `, ${Object.values(history).reduce((n, entries) => n + entries.length, 0)} history entries`;
+	const start = performance.now();
+	const results = await inParallel(config.databases, parallelism, async (entry) => {
+		const result = await compileInWorker(entry, { outputDir, withHistory });
+		const history =
+			result.historyEntries === null ? '' : `, ${result.historyEntries} history entries`;
 		console.log(
-			`    -> ${compiled.customFormats.length} CFs, ${compiled.qualityProfiles.length} QPs, ${compiled.regularExpressions.length} regexes${historyCount} (${elapsed}ms)`
+			`  ${entry.name} (${entry.repo}@${entry.branch}) -> ${result.customFormats} CFs, ${result.qualityProfiles} QPs, ${result.regularExpressions} regexes${history} (${result.elapsedMs.toFixed(0)}ms)`
 		);
-	}
+		return result;
+	});
+
+	const navIndex: NavIndex = {};
+	for (const result of results) navIndex[result.id] = result.nav;
 
 	// Check for slug collisions
 	const collisions = checkSlugCollisions(navIndex);
@@ -191,7 +135,10 @@ function main(): void {
 	writeFileSync(join(outputDir, 'index.json'), JSON.stringify(navIndex));
 
 	cleanupTempDirs();
-	console.log('\nDone.');
+	console.log(`\nDone in ${((performance.now() - start) / 1000).toFixed(1)}s.`);
 }
 
-main();
+main().catch((error: unknown) => {
+	console.error(error instanceof Error ? error.message : error);
+	process.exit(1);
+});
