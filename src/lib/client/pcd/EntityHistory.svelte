@@ -77,6 +77,11 @@
 		changed: 'border-l-2 border-border pl-3'
 	} as const;
 
+	const toneClass = {
+		added: 'border-success-border bg-success-bg text-success-text',
+		removed: 'border-danger-border bg-danger-bg text-danger-text'
+	} as const;
+
 	const segmentClass = {
 		same: '',
 		added: 'bg-success-bg text-success-text',
@@ -153,7 +158,8 @@
 				href={part.href}
 				class="{inlineCode} text-link-text hover:underline">{part.text}</a>
 		{:else}
-			<span class="{inlineCode} text-text-soft">{part.text}</span>
+			<span class="{inlineCode} {part.tone ? toneClass[part.tone] : 'text-text-soft'}"
+				>{part.text}</span>
 		{/if}
 	{/each}
 {/snippet}

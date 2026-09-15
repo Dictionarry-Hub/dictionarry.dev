@@ -22,7 +22,14 @@ import { marked } from 'marked';
 
 export type SummaryPart =
 	| { kind: 'text'; text: string }
-	| { kind: 'ref'; text: string; href: string | null; external?: boolean };
+	| {
+			kind: 'ref';
+			text: string;
+			href: string | null;
+			external?: boolean;
+			/** Colour the pill as something that joined or left. */
+			tone?: 'added' | 'removed';
+	  };
 
 export interface DiffSegment {
 	kind: 'same' | 'added' | 'removed';
@@ -321,17 +328,21 @@ function presentSet(label: string, change: EntityChange): ChangeView {
 		return { summary: [text(`${label} reordered`)] };
 	}
 	const summary: SummaryPart[] = [text(label)];
-	if (added.length > 0) summary.push(text(' added '), ...pills(added));
+	if (added.length > 0) summary.push(text(' added '), ...pills(added, 'added'));
 	if (removed.length > 0) {
-		summary.push(text(added.length > 0 ? '; removed ' : ' removed '), ...pills(removed));
+		summary.push(
+			text(added.length > 0 ? '; removed ' : ' removed '),
+			...pills(removed, 'removed')
+		);
 	}
 	return { summary };
 }
 
-function pills(names: string[]): SummaryPart[] {
-	return names.flatMap((name, index) =>
-		index === 0 ? [ref(name, null)] : [text(', '), ref(name, null)]
-	);
+function pills(names: string[], tone: 'added' | 'removed'): SummaryPart[] {
+	return names.flatMap((name, index) => {
+		const pill: SummaryPart = { kind: 'ref', text: name, href: null, tone };
+		return index === 0 ? [pill] : [text(', '), pill];
+	});
 }
 
 function presentRegex101(change: EntityChange): ChangeView {
