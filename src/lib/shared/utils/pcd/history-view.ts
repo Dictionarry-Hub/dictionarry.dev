@@ -327,14 +327,11 @@ function presentSet(label: string, change: EntityChange): ChangeView {
 	if (added.length === 0 && removed.length === 0) {
 		return { summary: [text(`${label} reordered`)] };
 	}
-	const summary: SummaryPart[] = [text(label)];
-	if (added.length > 0) summary.push(text(' added '), ...pills(added, 'added'));
-	if (removed.length > 0) {
-		summary.push(
-			text(added.length > 0 ? '; removed ' : ' removed '),
-			...pills(removed, 'removed')
-		);
-	}
+	// The pill colours say added or removed; the words would repeat them.
+	const summary: SummaryPart[] = [text(`${label} `)];
+	summary.push(...pills(added, 'added'));
+	if (added.length > 0 && removed.length > 0) summary.push(text(' '));
+	summary.push(...pills(removed, 'removed'));
 	return { summary };
 }
 

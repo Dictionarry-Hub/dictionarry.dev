@@ -331,7 +331,7 @@ describe('presentChange: other shapes', () => {
 			ctx
 		);
 
-		expect(plain(view!.summary)).toBe('Tags added C, D; removed A');
+		expect(plain(view!.summary)).toBe('Tags C, D A');
 		expect(
 			view!.summary
 				.filter((part) => part.kind === 'ref')
