@@ -45,6 +45,6 @@ metadata share one origin. This output is deployed to GitHub Pages.
 There is no runtime, no server process, and no environment variables at serve time. Deployment is
 copying files.
 
-Search Elo ranking is controlled by the optional build-time `PUBLIC_SEARCH_ELO_ENABLED` variable.
-It defaults to `false`; set it to `true` to blend Elo ratings into search results. The same variable
+Search Elo ranking is controlled by the optional build-time `PUBLIC_SEARCH_ELO_ENABLED` variable. It
+defaults to `false`; set it to `true` to blend Elo ratings into search results. The same variable
 works in development and requires a development-server restart when changed.

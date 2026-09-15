@@ -18,16 +18,16 @@ const languageLoaders = {
 type HighlightLanguage = keyof typeof languageLoaders;
 
 const aliases: Record<string, HighlightLanguage> = {
-	js: 'javascript',
-	ts: 'typescript',
-	sh: 'shellscript',
-	bash: 'shellscript',
-	shell: 'shellscript',
-	zsh: 'shellscript',
-	py: 'python',
-	yml: 'yaml',
-	md: 'markdown',
-	cs: 'csharp',
+	'js': 'javascript',
+	'ts': 'typescript',
+	'sh': 'shellscript',
+	'bash': 'shellscript',
+	'shell': 'shellscript',
+	'zsh': 'shellscript',
+	'py': 'python',
+	'yml': 'yaml',
+	'md': 'markdown',
+	'cs': 'csharp',
 	'c#': 'csharp'
 };
 
@@ -37,22 +37,23 @@ let highlighterPromise: Promise<HighlighterCore> | undefined;
 
 async function getHighlighter(): Promise<HighlighterCore> {
 	if (!highlighterPromise) {
-		highlighterPromise = Promise.all([
-			import('shiki/core'),
-			import('shiki/engine/javascript')
-		])
-			.then(([{ createCssVariablesTheme, createHighlighterCore }, { createJavaScriptRegexEngine }]) =>
-				createHighlighterCore({
-					themes: [
-						createCssVariablesTheme({
-							name: 'css-variables',
-							variablePrefix: '--theme-code-',
-							fontStyle: true
-						})
-					],
-					langs: [],
-					engine: createJavaScriptRegexEngine()
-				})
+		highlighterPromise = Promise.all([import('shiki/core'), import('shiki/engine/javascript')])
+			.then(
+				([
+					{ createCssVariablesTheme, createHighlighterCore },
+					{ createJavaScriptRegexEngine }
+				]) =>
+					createHighlighterCore({
+						themes: [
+							createCssVariablesTheme({
+								name: 'css-variables',
+								variablePrefix: '--theme-code-',
+								fontStyle: true
+							})
+						],
+						langs: [],
+						engine: createJavaScriptRegexEngine()
+					})
 			)
 			.catch((error: unknown) => {
 				highlighterPromise = undefined;
