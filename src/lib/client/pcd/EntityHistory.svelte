@@ -97,7 +97,10 @@
 	}
 
 	// Same icons as the sidebar nav groups.
-	const typeIcons: Record<string, Component<{ size?: number; class?: string }>> = {
+	const typeIcons: Record<
+		string,
+		Component<{ 'size'?: number; 'class'?: string; 'aria-label'?: string }>
+	> = {
 		quality_profile: SlidersHorizontal,
 		custom_format: Tags,
 		regular_expression: Regex,
