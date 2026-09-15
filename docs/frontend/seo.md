@@ -89,7 +89,7 @@ list and entity page. Entity pages take `lastmod` from the history replay, the d
 commit that touched the entity, so crawlers re-fetch pages that actually changed. Artifact routes
 (`.md`, `.yaml`, `.json`) are alternate representations and are not listed. `robots.txt` is also a
 route so its `Sitemap:` line carries the configured site origin. Entry building lives in
-`src/lib/shared/utils/seo/sitemap.ts`.
+`src/lib/shared/utils/seo/sitemap.ts` and the XML rendering in `src/lib/shared/utils/seo/xml.ts`.
 
 ## Validation
 

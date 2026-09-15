@@ -7,13 +7,9 @@
 import { pcdDatabaseEntries, pcdNavDatabase } from '../pcd/prerender.js';
 import { entityLastChanged } from '../pcd/history-data.js';
 import { slugify } from '../slug.js';
+import type { SitemapEntry } from './xml.js';
 
-export interface SitemapEntry {
-	/** Site-relative path starting with `/`. */
-	path: string;
-	/** ISO date or timestamp. */
-	lastmod?: string;
-}
+export { renderSitemap, type SitemapEntry } from './xml.js';
 
 export interface ArticleLike {
 	slug: string;
@@ -84,28 +80,4 @@ export function sitemapEntries(devLogs: ArticleLike[], wiki: ArticleLike[]): Sit
 
 function withLastmod(path: string, lastmod: string | null): SitemapEntry {
 	return lastmod === null ? { path } : { path, lastmod };
-}
-
-export function renderSitemap(siteUrl: string, entries: SitemapEntry[]): string {
-	const origin = siteUrl.replace(/\/$/, '');
-	const urls = entries.map((entry) => {
-		const lastmod = entry.lastmod ? `<lastmod>${entry.lastmod.slice(0, 10)}</lastmod>` : '';
-		return `  <url><loc>${escapeXml(origin + entry.path)}</loc>${lastmod}</url>`;
-	});
-	return [
-		'<?xml version="1.0" encoding="UTF-8"?>',
-		'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-		...urls,
-		'</urlset>',
-		''
-	].join('\n');
-}
-
-function escapeXml(value: string): string {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&apos;');
 }

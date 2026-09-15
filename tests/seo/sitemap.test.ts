@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderSitemap } from '$lib/shared/utils/seo/sitemap';
+import { renderSitemap } from '$lib/shared/utils/seo/xml';
 
 describe('renderSitemap', () => {
 	it('lists each entry as an absolute URL with an optional date-only lastmod', () => {
