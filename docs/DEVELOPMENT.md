@@ -22,18 +22,21 @@ merging.
 
 ## CI
 
-Every pull request targeting `develop` runs five checks in parallel:
+Every pull request targeting `develop` runs these checks:
 
-| Job        | Command             | What it catches                   |
-| ---------- | ------------------- | --------------------------------- |
-| Format     | `pnpm format:check` | Unformatted code                  |
-| Lint       | `pnpm lint`         | ESLint errors                     |
-| Type Check | `pnpm check`        | TypeScript and Svelte type errors |
-| Test       | `pnpm test`         | Failing unit tests (Vitest)       |
-| Build      | `pnpm build`        | Build failures, broken routes     |
+| Job        | Command                                | What it catches                   |
+| ---------- | -------------------------------------- | --------------------------------- |
+| Format     | `pnpm format:check`                    | Unformatted code                  |
+| Test       | `pnpm test`                            | Failing unit tests (Vitest)       |
+| Compile    | `pnpm compile:api`, `pnpm compile:pcd` | Upstream data that fails to build |
+| Type Check | `pnpm check`                           | TypeScript and Svelte type errors |
+| Build      | `pnpm build`                           | Build failures, broken routes     |
+| Lint       | `pnpm lint`                            | ESLint and custom lint errors     |
 
-All five must pass before a PR can be merged. Tests live in `tests/` at the repository root. PR
-titles are validated against conventional commit format.
+Format and Test run on their own. Compile runs once and uploads `src/lib/data` as an artifact; Type
+Check and Build download it, and Lint downloads both that and the `build` output because the custom
+lint rules inspect prerendered HTML. All six must pass before a PR can be merged. Tests live in
+`tests/` at the repository root. PR titles are validated against conventional commit format.
 
 ## Deployment
 

@@ -32,42 +32,6 @@ jobs:
             - run: pnpm install --frozen-lockfile
             - run: pnpm format:check
 
-    lint:
-        name: Lint
-        runs-on: ubuntu-latest
-        timeout-minutes: 10
-        steps:
-            - uses: actions/checkout@v7
-            - uses: pnpm/action-setup@v6
-              with:
-                  standalone: true
-            - uses: actions/setup-node@v7
-              with:
-                  node-version: 22
-                  cache: 'pnpm'
-            - run: pnpm install --frozen-lockfile
-            - run: pnpm compile:api
-            - run: pnpm compile:pcd
-            - run: pnpm build
-            - run: pnpm lint
-
-    type-check:
-        name: Type Check
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v7
-            - uses: pnpm/action-setup@v6
-              with:
-                  standalone: true
-            - uses: actions/setup-node@v7
-              with:
-                  node-version: 22
-                  cache: 'pnpm'
-            - run: pnpm install --frozen-lockfile
-            - run: pnpm compile:api
-            - run: pnpm compile:pcd
-            - run: pnpm check
-
     test:
         name: Test
         runs-on: ubuntu-latest
@@ -83,8 +47,8 @@ jobs:
             - run: pnpm install --frozen-lockfile
             - run: pnpm test
 
-    build:
-        name: Build
+    compile:
+        name: Compile
         runs-on: ubuntu-latest
         timeout-minutes: 10
         steps:
@@ -99,4 +63,80 @@ jobs:
             - run: pnpm install --frozen-lockfile
             - run: pnpm compile:api
             - run: pnpm compile:pcd
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: data
+                  path: src/lib/data
+                  include-hidden-files: true
+                  if-no-files-found: error
+
+    type-check:
+        name: Type Check
+        needs: compile
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: pnpm/action-setup@v6
+              with:
+                  standalone: true
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 22
+                  cache: 'pnpm'
+            - run: pnpm install --frozen-lockfile
+            - uses: actions/download-artifact@v8
+              with:
+                  name: data
+                  path: src/lib/data
+            - run: pnpm check
+
+    build:
+        name: Build
+        needs: compile
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - uses: actions/checkout@v7
+            - uses: pnpm/action-setup@v6
+              with:
+                  standalone: true
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 22
+                  cache: 'pnpm'
+            - run: pnpm install --frozen-lockfile
+            - uses: actions/download-artifact@v8
+              with:
+                  name: data
+                  path: src/lib/data
             - run: pnpm build
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: build
+                  path: build
+                  if-no-files-found: error
+
+    lint:
+        name: Lint
+        needs: build
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - uses: actions/checkout@v7
+            - uses: pnpm/action-setup@v6
+              with:
+                  standalone: true
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 22
+                  cache: 'pnpm'
+            - run: pnpm install --frozen-lockfile
+            - uses: actions/download-artifact@v8
+              with:
+                  name: data
+                  path: src/lib/data
+            - uses: actions/download-artifact@v8
+              with:
+                  name: build
+                  path: build
+            - run: pnpm lint
