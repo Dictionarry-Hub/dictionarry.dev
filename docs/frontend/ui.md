@@ -564,8 +564,9 @@ Renders a formatted `<time>` element with a `datetime` attribute for SEO.
 
 Short format: "May 17". Long format: "May 17, 2026". Both are fixed to en-US. Numeric format is all
 digits in the visitor's locale ("5/17/2026" or "17/05/2026"), for dense tables; the prerendered text
-uses the build machine's locale and is patched on hydration. The `datetime` attribute is always ISO.
-Accepts ISO date strings and full ISO timestamps (as produced by YAML date parsing).
+uses the build machine's locale and is patched on hydration (see the locale note in
+[seo.md](./seo.md#locale-dependent-text)). The `datetime` attribute is always ISO. Accepts ISO date
+strings and full ISO timestamps (as produced by YAML date parsing).
 
 ### Author
 
