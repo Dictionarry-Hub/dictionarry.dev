@@ -333,8 +333,10 @@ describe('presentChange: other shapes', () => {
 
 		expect(plain(view!.summary)).toBe('Tags added C, D; removed A');
 		expect(
-			view!.summary.filter((part) => part.kind === 'ref').map((part) => part.text)
-		).toEqual(['C', 'D', 'A']);
+			view!.summary
+				.filter((part) => part.kind === 'ref')
+				.map((part) => `${part.text}:${part.tone}`)
+		).toEqual(['C:added', 'D:added', 'A:removed']);
 	});
 
 	it('summarises quality entries and positions', () => {
