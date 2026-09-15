@@ -19,6 +19,26 @@ import type {
 } from '../../src/lib/types/pcd.js';
 import type { DatabaseEntry, PcdManifest } from './types.js';
 
+// Prepared statements are cached per connection. Preparing parses and plans
+// the SQL; the extractors run the same few dozen queries thousands of times
+// (once per entity, once per condition), and history replay re-reads
+// entities after every op file, so reuse is most of the win.
+const statements = new WeakMap<Database.Database, Map<string, Database.Statement>>();
+
+function prepare(db: Database.Database, sql: string): Database.Statement {
+	let cache = statements.get(db);
+	if (!cache) {
+		cache = new Map();
+		statements.set(db, cache);
+	}
+	let statement = cache.get(sql);
+	if (!statement) {
+		statement = db.prepare(sql);
+		cache.set(sql, statement);
+	}
+	return statement;
+}
+
 // Sonarr stores these as integers in the DB; resolve to semantic strings matching Radarr's format
 const SONARR_COLON_REPLACEMENT: Record<number, string> = {
 	0: 'delete',
@@ -75,11 +95,10 @@ export function extractDatabase(
 // --- Custom Formats ---
 
 export function extractCustomFormats(db: Database.Database, name?: string): CustomFormat[] {
-	const rows = db
-		.prepare(
-			`SELECT name, description, include_in_rename FROM custom_formats ${nameFilter(name)} ORDER BY name`
-		)
-		.all(...nameArgs(name)) as {
+	const rows = prepare(
+		db,
+		`SELECT name, description, include_in_rename FROM custom_formats ${nameFilter(name)} ORDER BY name`
+	).all(...nameArgs(name)) as {
 		name: string;
 		description: string | null;
 		include_in_rename: number;
@@ -96,14 +115,13 @@ export function extractCustomFormats(db: Database.Database, name?: string): Cust
 }
 
 function extractConditions(db: Database.Database, cfName: string): Condition[] {
-	const rows = db
-		.prepare(
-			`SELECT name, type, arr_type, negate, required
+	const rows = prepare(
+		db,
+		`SELECT name, type, arr_type, negate, required
 			 FROM custom_format_conditions
 			 WHERE custom_format_name = ?
 			 ORDER BY name`
-		)
-		.all(cfName) as {
+	).all(cfName) as {
 		name: string;
 		type: string;
 		arr_type: string;
@@ -131,26 +149,24 @@ function extractConditionData(
 		case 'release_title':
 		case 'release_group':
 		case 'edition': {
-			const row = db
-				.prepare(
-					`SELECT regular_expression_name
+			const row = prepare(
+				db,
+				`SELECT regular_expression_name
 					 FROM condition_patterns
 					 WHERE custom_format_name = ? AND condition_name = ?`
-				)
-				.get(cfName, condName) as { regular_expression_name: string } | undefined;
+			).get(cfName, condName) as { regular_expression_name: string } | undefined;
 			return {
 				type: type as 'release_title' | 'release_group' | 'edition',
 				regularExpressionName: row?.regular_expression_name ?? ''
 			};
 		}
 		case 'language': {
-			const row = db
-				.prepare(
-					`SELECT language_name, except_language
+			const row = prepare(
+				db,
+				`SELECT language_name, except_language
 					 FROM condition_languages
 					 WHERE custom_format_name = ? AND condition_name = ?`
-				)
-				.get(cfName, condName) as
+			).get(cfName, condName) as
 				{ language_name: string; except_language: number } | undefined;
 			return {
 				type: 'language',
@@ -159,57 +175,51 @@ function extractConditionData(
 			};
 		}
 		case 'source': {
-			const row = db
-				.prepare(
-					`SELECT source FROM condition_sources
+			const row = prepare(
+				db,
+				`SELECT source FROM condition_sources
 					 WHERE custom_format_name = ? AND condition_name = ?`
-				)
-				.get(cfName, condName) as { source: string } | undefined;
+			).get(cfName, condName) as { source: string } | undefined;
 			return { type: 'source', source: row?.source ?? '' };
 		}
 		case 'resolution': {
-			const row = db
-				.prepare(
-					`SELECT resolution FROM condition_resolutions
+			const row = prepare(
+				db,
+				`SELECT resolution FROM condition_resolutions
 					 WHERE custom_format_name = ? AND condition_name = ?`
-				)
-				.get(cfName, condName) as { resolution: string } | undefined;
+			).get(cfName, condName) as { resolution: string } | undefined;
 			return { type: 'resolution', resolution: row?.resolution ?? '' };
 		}
 		case 'quality_modifier': {
-			const row = db
-				.prepare(
-					`SELECT quality_modifier FROM condition_quality_modifiers
+			const row = prepare(
+				db,
+				`SELECT quality_modifier FROM condition_quality_modifiers
 					 WHERE custom_format_name = ? AND condition_name = ?`
-				)
-				.get(cfName, condName) as { quality_modifier: string } | undefined;
+			).get(cfName, condName) as { quality_modifier: string } | undefined;
 			return { type: 'quality_modifier', qualityModifier: row?.quality_modifier ?? '' };
 		}
 		case 'release_type': {
-			const row = db
-				.prepare(
-					`SELECT release_type FROM condition_release_types
+			const row = prepare(
+				db,
+				`SELECT release_type FROM condition_release_types
 					 WHERE custom_format_name = ? AND condition_name = ?`
-				)
-				.get(cfName, condName) as { release_type: string } | undefined;
+			).get(cfName, condName) as { release_type: string } | undefined;
 			return { type: 'release_type', releaseType: row?.release_type ?? '' };
 		}
 		case 'indexer_flag': {
-			const row = db
-				.prepare(
-					`SELECT flag FROM condition_indexer_flags
+			const row = prepare(
+				db,
+				`SELECT flag FROM condition_indexer_flags
 					 WHERE custom_format_name = ? AND condition_name = ?`
-				)
-				.get(cfName, condName) as { flag: string } | undefined;
+			).get(cfName, condName) as { flag: string } | undefined;
 			return { type: 'indexer_flag', flag: row?.flag ?? '' };
 		}
 		case 'size': {
-			const row = db
-				.prepare(
-					`SELECT min_bytes, max_bytes FROM condition_sizes
+			const row = prepare(
+				db,
+				`SELECT min_bytes, max_bytes FROM condition_sizes
 					 WHERE custom_format_name = ? AND condition_name = ?`
-				)
-				.get(cfName, condName) as
+			).get(cfName, condName) as
 				{ min_bytes: number | null; max_bytes: number | null } | undefined;
 			return {
 				type: 'size',
@@ -218,12 +228,11 @@ function extractConditionData(
 			};
 		}
 		case 'year': {
-			const row = db
-				.prepare(
-					`SELECT min_year, max_year FROM condition_years
+			const row = prepare(
+				db,
+				`SELECT min_year, max_year FROM condition_years
 					 WHERE custom_format_name = ? AND condition_name = ?`
-				)
-				.get(cfName, condName) as
+			).get(cfName, condName) as
 				{ min_year: number | null; max_year: number | null } | undefined;
 			return { type: 'year', minYear: row?.min_year ?? null, maxYear: row?.max_year ?? null };
 		}
@@ -233,14 +242,13 @@ function extractConditionData(
 }
 
 function extractTests(db: Database.Database, cfName: string): CustomFormatTest[] {
-	const rows = db
-		.prepare(
-			`SELECT title, type, should_match, description
+	const rows = prepare(
+		db,
+		`SELECT title, type, should_match, description
 			 FROM custom_format_tests
 			 WHERE custom_format_name = ?
 			 ORDER BY title`
-		)
-		.all(cfName) as {
+	).all(cfName) as {
 		title: string;
 		type: string;
 		should_match: number;
@@ -258,13 +266,12 @@ function extractTests(db: Database.Database, cfName: string): CustomFormatTest[]
 // --- Quality Profiles ---
 
 export function extractQualityProfiles(db: Database.Database, name?: string): QualityProfile[] {
-	const rows = db
-		.prepare(
-			`SELECT name, description, upgrades_allowed, minimum_custom_format_score,
+	const rows = prepare(
+		db,
+		`SELECT name, description, upgrades_allowed, minimum_custom_format_score,
 			        upgrade_until_score, upgrade_score_increment
 			 FROM quality_profiles ${nameFilter(name)} ORDER BY name`
-		)
-		.all(...nameArgs(name)) as {
+	).all(...nameArgs(name)) as {
 		name: string;
 		description: string | null;
 		upgrades_allowed: number;
@@ -288,27 +295,25 @@ export function extractQualityProfiles(db: Database.Database, name?: string): Qu
 }
 
 function extractProfileLanguages(db: Database.Database, profileName: string): ProfileLanguage[] {
-	const rows = db
-		.prepare(
-			`SELECT language_name, type
+	const rows = prepare(
+		db,
+		`SELECT language_name, type
 			 FROM quality_profile_languages
 			 WHERE quality_profile_name = ?
 			 ORDER BY language_name`
-		)
-		.all(profileName) as { language_name: string; type: string }[];
+	).all(profileName) as { language_name: string; type: string }[];
 
 	return rows.map((row) => ({ name: row.language_name, type: row.type }));
 }
 
 function extractProfileQualities(db: Database.Database, profileName: string): QualityEntry[] {
-	const rows = db
-		.prepare(
-			`SELECT quality_name, quality_group_name, position, enabled, upgrade_until
+	const rows = prepare(
+		db,
+		`SELECT quality_name, quality_group_name, position, enabled, upgrade_until
 			 FROM quality_profile_qualities
 			 WHERE quality_profile_name = ?
 			 ORDER BY position`
-		)
-		.all(profileName) as {
+	).all(profileName) as {
 		quality_name: string | null;
 		quality_group_name: string | null;
 		position: number;
@@ -332,14 +337,13 @@ function extractQualityGroup(
 	profileName: string,
 	groupName: string
 ): QualityGroup {
-	const members = db
-		.prepare(
-			`SELECT quality_name
+	const members = prepare(
+		db,
+		`SELECT quality_name
 			 FROM quality_group_members
 			 WHERE quality_profile_name = ? AND quality_group_name = ?
 			 ORDER BY position`
-		)
-		.all(profileName, groupName) as { quality_name: string }[];
+	).all(profileName, groupName) as { quality_name: string }[];
 
 	return {
 		name: groupName,
@@ -348,14 +352,13 @@ function extractQualityGroup(
 }
 
 function extractProfileScoring(db: Database.Database, profileName: string): ProfileScore[] {
-	const rows = db
-		.prepare(
-			`SELECT custom_format_name, arr_type, score
+	const rows = prepare(
+		db,
+		`SELECT custom_format_name, arr_type, score
 			 FROM quality_profile_custom_formats
 			 WHERE quality_profile_name = ?
 			 ORDER BY custom_format_name, arr_type`
-		)
-		.all(profileName) as { custom_format_name: string; arr_type: string; score: number }[];
+	).all(profileName) as { custom_format_name: string; arr_type: string; score: number }[];
 
 	return rows.map((row) => ({
 		customFormatName: row.custom_format_name,
@@ -370,11 +373,10 @@ export function extractRegularExpressions(
 	db: Database.Database,
 	name?: string
 ): RegularExpression[] {
-	const rows = db
-		.prepare(
-			`SELECT name, pattern, description, regex101_id FROM regular_expressions ${nameFilter(name)} ORDER BY name`
-		)
-		.all(...nameArgs(name)) as {
+	const rows = prepare(
+		db,
+		`SELECT name, pattern, description, regex101_id FROM regular_expressions ${nameFilter(name)} ORDER BY name`
+	).all(...nameArgs(name)) as {
 		name: string;
 		pattern: string;
 		description: string | null;
@@ -393,14 +395,13 @@ export function extractRegularExpressions(
 // --- Delay Profiles ---
 
 export function extractDelayProfiles(db: Database.Database, name?: string): DelayProfile[] {
-	const rows = db
-		.prepare(
-			`SELECT name, preferred_protocol, usenet_delay, torrent_delay,
+	const rows = prepare(
+		db,
+		`SELECT name, preferred_protocol, usenet_delay, torrent_delay,
 			        bypass_if_highest_quality, bypass_if_above_custom_format_score,
 			        minimum_custom_format_score
 			 FROM delay_profiles ${nameFilter(name)} ORDER BY name`
-		)
-		.all(...nameArgs(name)) as {
+	).all(...nameArgs(name)) as {
 		name: string;
 		preferred_protocol: string;
 		usenet_delay: number | null;
@@ -431,13 +432,12 @@ export function extractNaming(
 	const table = `${arrType}_naming`;
 
 	if (arrType === 'radarr') {
-		const rows = db
-			.prepare(
-				`SELECT name, rename, movie_format, movie_folder_format,
+		const rows = prepare(
+			db,
+			`SELECT name, rename, movie_format, movie_folder_format,
 				        replace_illegal_characters, colon_replacement_format
 				 FROM ${table} ${nameFilter(name)} ORDER BY name`
-			)
-			.all(...nameArgs(name)) as {
+		).all(...nameArgs(name)) as {
 			name: string;
 			rename: number;
 			movie_format: string;
@@ -459,15 +459,14 @@ export function extractNaming(
 		}));
 	}
 
-	const rows = db
-		.prepare(
-			`SELECT name, rename, standard_episode_format, daily_episode_format,
+	const rows = prepare(
+		db,
+		`SELECT name, rename, standard_episode_format, daily_episode_format,
 			        anime_episode_format, series_folder_format, season_folder_format,
 			        replace_illegal_characters, colon_replacement_format,
 			        custom_colon_replacement_format, multi_episode_style
 			 FROM ${table} ${nameFilter(name)} ORDER BY name`
-		)
-		.all(...nameArgs(name)) as {
+	).all(...nameArgs(name)) as {
 		name: string;
 		rename: number;
 		standard_episode_format: string;
@@ -506,11 +505,10 @@ export function extractMediaSettings(
 ): MediaSettings[] {
 	const table = `${arrType}_media_settings`;
 
-	const rows = db
-		.prepare(
-			`SELECT name, propers_repacks, enable_media_info FROM ${table} ${nameFilter(name)} ORDER BY name`
-		)
-		.all(...nameArgs(name)) as {
+	const rows = prepare(
+		db,
+		`SELECT name, propers_repacks, enable_media_info FROM ${table} ${nameFilter(name)} ORDER BY name`
+	).all(...nameArgs(name)) as {
 		name: string;
 		propers_repacks: string;
 		enable_media_info: number;
@@ -530,21 +528,21 @@ export function extractQualityDefinitions(
 ): QualityDefinitionConfig[] {
 	const table = `${arrType}_quality_definitions`;
 
-	const names = db
-		.prepare(`SELECT DISTINCT name FROM ${table} ${nameFilter(name)} ORDER BY name`)
-		.all(...nameArgs(name)) as {
+	const names = prepare(
+		db,
+		`SELECT DISTINCT name FROM ${table} ${nameFilter(name)} ORDER BY name`
+	).all(...nameArgs(name)) as {
 		name: string;
 	}[];
 
 	return names.map((n) => {
-		const tiers = db
-			.prepare(
-				`SELECT quality_name, min_size, max_size, preferred_size
+		const tiers = prepare(
+			db,
+			`SELECT quality_name, min_size, max_size, preferred_size
 				 FROM ${table}
 				 WHERE name = ?
 				 ORDER BY quality_name`
-			)
-			.all(n.name) as {
+		).all(n.name) as {
 			quality_name: string;
 			min_size: number;
 			max_size: number;
@@ -581,9 +579,10 @@ function extractTags(
 	column: string,
 	entityName: string
 ): string[] {
-	const rows = db
-		.prepare(`SELECT tag_name FROM ${table} WHERE ${column} = ? ORDER BY tag_name`)
-		.all(entityName) as { tag_name: string }[];
+	const rows = prepare(
+		db,
+		`SELECT tag_name FROM ${table} WHERE ${column} = ? ORDER BY tag_name`
+	).all(entityName) as { tag_name: string }[];
 
 	return rows.map((r) => r.tag_name);
 }
