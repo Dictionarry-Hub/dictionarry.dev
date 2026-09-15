@@ -1,7 +1,7 @@
 <script lang="ts">
 	interface Props {
 		date: string;
-		format?: 'short' | 'long';
+		format?: 'short' | 'long' | 'iso';
 		class?: string;
 	}
 
@@ -12,6 +12,7 @@
 	const iso = $derived(date.split('T')[0]);
 
 	const formatted = $derived.by(() => {
+		if (format === 'iso') return iso;
 		if (format === 'short') {
 			return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 		}

@@ -47,7 +47,7 @@
 	const columns: Column<HistoryRow>[] = [
 		{ key: 'ref', header: 'Commit', width: 'w-28' },
 		{ key: 'title', header: 'Change' },
-		{ key: 'date', header: 'Date', sortable: true, align: 'right', width: 'w-40' }
+		{ key: 'date', header: 'Date', sortable: true, align: 'right', width: 'w-32' }
 	];
 
 	const kindColor: Record<EntityHistoryItem['kind'], 'success' | 'danger' | 'info'> = {
@@ -289,7 +289,8 @@
 				{:else if column.key === 'date'}
 					<DateTime
 						date={row.date}
-						class="text-text-muted" />
+						format="iso"
+						class="font-mono text-text-muted" />
 				{/if}
 			{/snippet}
 			{#snippet expanded(row)}
@@ -304,7 +305,10 @@
 				</div>
 				<div class="mt-2 flex items-center justify-between text-sm text-text-muted">
 					{@render commitLink(row.item)}
-					<DateTime date={row.date} />
+					<DateTime
+						date={row.date}
+						format="iso"
+						class="font-mono" />
 				</div>
 				<p class="mt-2 text-sm text-text-muted">{changeSummary(row.item)}</p>
 			{/snippet}
