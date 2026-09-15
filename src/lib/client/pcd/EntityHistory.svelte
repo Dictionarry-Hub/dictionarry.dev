@@ -1,10 +1,24 @@
 <script lang="ts">
-	import { ExternalLink } from '@lucide/svelte';
+	import {
+		Clock,
+		ExternalLink,
+		FileText,
+		Regex,
+		Ruler,
+		Settings,
+		SlidersHorizontal,
+		Tags
+	} from '@lucide/svelte';
+	import type { Component } from 'svelte';
 	import AdaptiveList from '$lib/client/ui/adaptive-list/AdaptiveList.svelte';
 	import Badge from '$lib/client/ui/badge/Badge.svelte';
 	import DateTime from '$lib/client/ui/datetime/DateTime.svelte';
 	import type { Column } from '$lib/client/ui/table/types';
-	import { formatHistoryKind, type EntityHistoryItem } from '$lib/shared/utils/pcd/history';
+	import {
+		formatEntityType,
+		formatHistoryKind,
+		type EntityHistoryItem
+	} from '$lib/shared/utils/pcd/history';
 	import type { ChangeDetail, ChangeView, SummaryPart } from '$lib/shared/utils/pcd/history-view';
 
 	interface Props {
@@ -56,6 +70,20 @@
 		const base = count === 1 ? '1 change' : `${count} changes`;
 		return item.kind === 'renamed' ? `Renamed from ${item.renamedFrom}, ${base}` : base;
 	}
+
+	// Same icons as the sidebar nav groups.
+	const typeIcons: Record<string, Component<{ size?: number; class?: string }>> = {
+		quality_profile: SlidersHorizontal,
+		custom_format: Tags,
+		regular_expression: Regex,
+		delay_profile: Clock,
+		radarr_naming: FileText,
+		sonarr_naming: FileText,
+		radarr_media_settings: Settings,
+		sonarr_media_settings: Settings,
+		radarr_quality_definitions: Ruler,
+		sonarr_quality_definitions: Ruler
+	};
 
 	function hasDetails(item: EntityHistoryItem): boolean {
 		return item.changes.length > 0 || item.related.length > 0 || item.kind === 'renamed';
@@ -150,11 +178,19 @@
 	{#if item.related.length > 0}
 		<div class="mt-4">
 			<p class="mb-1 text-sm text-text-muted">Also changed in this commit</p>
-			<ul class="list-disc space-y-1 pl-5">
+			<ul class="space-y-1">
 				{#each item.related as link (link.href)}
-					<li>
+					{@const TypeIcon = typeIcons[link.entityType]}
+					<li class="flex items-center gap-2">
+						{#if TypeIcon}
+							<TypeIcon
+								size={14}
+								class="shrink-0 text-text-muted"
+								aria-label={formatEntityType(link.entityType)} />
+						{/if}
 						<a
 							href={link.href}
+							title={formatEntityType(link.entityType)}
 							class="text-sm text-link-text hover:underline">{link.label}</a>
 					</li>
 				{/each}

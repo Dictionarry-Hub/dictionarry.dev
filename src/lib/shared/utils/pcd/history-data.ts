@@ -3,13 +3,7 @@
 // the pipeline ran with --no-history every entity simply has no history.
 
 import type { CompiledDatabase, EntityHistory } from '$lib/types/pcd';
-import {
-	commitUrl,
-	entityHref,
-	formatEntityType,
-	shortHash,
-	type EntityHistoryItem
-} from './history.js';
+import { commitUrl, entityHref, shortHash, type EntityHistoryItem } from './history.js';
 import { presentChange, type PresentContext } from './history-view.js';
 
 const files = import.meta.glob<EntityHistory>('/src/lib/data/pcd/history/*.json', {
@@ -72,9 +66,7 @@ export function entityHistory(
 			}),
 			related: entry.related.flatMap((ref) => {
 				const href = entityHref(data.id, ref.entityType, ref.name);
-				return href === null
-					? []
-					: [{ label: `${ref.name} (${formatEntityType(ref.entityType)})`, href }];
+				return href === null ? [] : [{ entityType: ref.entityType, label: ref.name, href }];
 			})
 		}))
 		.reverse();

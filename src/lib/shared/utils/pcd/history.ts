@@ -7,6 +7,7 @@ import { slugify } from '$lib/shared/utils/slug';
 import type { ChangeView } from './history-view.js';
 
 export interface EntityHistoryLink {
+	entityType: string;
 	label: string;
 	href: string;
 }
