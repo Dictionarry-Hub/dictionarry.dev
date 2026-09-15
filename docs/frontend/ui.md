@@ -501,8 +501,8 @@ Select control backed by a dropdown menu. Wraps `Dropdown`, `DropdownHeader`, an
 
 `header` renders a `DropdownHeader` at the top of the menu (e.g. "Theme", "Database"). `iconOnly`
 renders just the matched option's icon as the trigger button. An option `emoji` takes precedence
-over its `icon`, in menu items and in the `iconOnly` trigger. Emoji
-rendering is platform-owned: glyphs differ across operating systems.
+over its `icon`, in menu items and in the `iconOnly` trigger. Emoji rendering is platform-owned:
+glyphs differ across operating systems.
 
 ### Badge
 
