@@ -81,6 +81,16 @@ The `og:image` and `twitter:image` must be absolute URLs.
 For mdsvex content, frontmatter provides the title and description. The layout component should
 handle rendering the `SEO` component automatically so content authors only write frontmatter.
 
+## Sitemap
+
+`/sitemap.xml` is a prerendered route (`src/routes/sitemap.xml/+server.ts`) listing every HTML page:
+the static pages, dev logs and wiki articles with their publish date as `lastmod`, and every PCD
+list and entity page. Entity pages take `lastmod` from the history replay, the date of the last
+commit that touched the entity, so crawlers re-fetch pages that actually changed. Artifact routes
+(`.md`, `.yaml`, `.json`) are alternate representations and are not listed. `robots.txt` is also a
+route so its `Sitemap:` line carries the configured site origin. Entry building lives in
+`src/lib/shared/utils/seo/sitemap.ts`.
+
 ## Validation
 
 The custom `require-seo` lint rule verifies that every route renders metadata through either the
