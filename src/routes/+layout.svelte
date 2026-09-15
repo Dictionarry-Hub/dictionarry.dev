@@ -60,6 +60,8 @@
 
 	const currentNav = $derived(data.pcdNav[databaseValue]);
 	const yamlView = $derived(mounted && page.url.searchParams.get('view') === 'yaml');
+	// PCD pages are tables and diffs, not prose, so they get a wider column.
+	const wideContent = $derived(database.isPcdRoute(page.url.pathname));
 
 	// Sync database from URL when on PCD routes
 	$effect(() => {
@@ -290,7 +292,9 @@
 <main class="min-h-screen bg-bg pl-80 font-sans text-text">
 	<div
 		id="top"
-		class="content-area mx-auto max-w-3xl px-6 py-10">
+		class="content-area mx-auto px-6 py-10 {wideContent
+			? 'content-wide max-w-5xl'
+			: 'max-w-3xl'}">
 		<div class="relative">
 			{@render children()}
 
@@ -325,13 +329,27 @@
 		overflow-y: auto;
 	}
 
+	/* The TOC floats once the column plus the panel fit beside the sidebar.
+	   Content is shifted left by half the panel's footprint so the pair
+	   reads as centered. Wide columns need the larger breakpoint. */
 	@media (min-width: 1280px) {
-		.content-area {
+		.content-area:not(.content-wide) {
 			margin-left: calc(50% - 24rem - 9rem);
 			margin-right: auto;
 		}
 
-		.toc-float {
+		.content-area:not(.content-wide) .toc-float {
+			display: block;
+		}
+	}
+
+	@media (min-width: 1600px) {
+		.content-wide {
+			margin-left: calc(50% - 32rem - 9rem);
+			margin-right: auto;
+		}
+
+		.content-wide .toc-float {
 			display: block;
 		}
 	}

@@ -474,9 +474,11 @@ headings (`h1` to `h3`) with ids become entries, and the first `h1` (with or wit
 a title link back to `#top`. Renders nothing on pages without id'd headings. Headings carrying a
 `data-method` attribute get a color-coded HTTP method label (used by the API reference).
 
-No props. Positioning is owned by the root layout, not the component: hidden below 1280px, floated
-to the right of the content column, pinned to the viewport (`position: fixed`) with an internal
-scrollbar when taller than the viewport.
+No props. Positioning is owned by the root layout, not the component: floated to the right of the
+content column, pinned to the viewport (`position: fixed`) with an internal scrollbar when taller
+than the viewport. The content column is `max-w-3xl` for prose and `max-w-5xl` on PCD routes (tables
+and diffs); the panel is hidden below 1280px for the prose column and below 1600px for the wide one,
+where the pair would not fit beside the sidebar.
 
 ### Dropdown
 
