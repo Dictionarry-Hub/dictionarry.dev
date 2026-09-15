@@ -8,7 +8,9 @@ history of every entity derived from the same replay.
 
 ```
 tooling/pcd/
-├── index.ts        # Entry point, orchestrates fetch -> replay -> extract
+├── index.ts        # Entry point: one worker thread per database, nav index
+├── compile.ts      # One database end to end (fetch -> replay -> extract -> write)
+├── worker.ts       # Worker thread body around compile.ts
 ├── config.json     # Database registry
 ├── fetch.ts        # git clone and op file to commit mapping
 ├── build.ts        # In-memory SQLite creation and op execution
@@ -53,7 +55,7 @@ Each entry has:
 ```
 pnpm compile:pcd [-- --no-history]
   1. Read config.json
-  2. For each database:
+  2. For each database, in its own worker thread (as many at once as there are cores):
      a. Clone the repo at its branch (blobless clone, full commit history)
      b. Read pcd.json manifest from the checkout
      c. Resolve schema version from manifest dependencies
@@ -67,6 +69,10 @@ pnpm compile:pcd [-- --no-history]
   3. Write index.json (nav-only data for sidebar)
   4. Clean up temp directories
 ```
+
+Databases compile in parallel because `better-sqlite3` is synchronous: each worker owns its
+connection and clones, and reports the nav data and counts back to the entry point, which merges
+them in config order. The schema clone cache is per worker, so each worker clones the schema once.
 
 With `--no-history`, step g and the per-file bookkeeping in h are skipped: base ops execute in one
 pass and only `{id}.json` is written. Pages and artifacts then show no History section.
@@ -101,6 +107,10 @@ numeric filename prefix (`0.schema.sql` before `1.languages.sql` before `10.some
 
 No custom SQLite functions are needed. Exported PCD ops use plain SQL with name-based WHERE clauses.
 
+Prepared statements are cached per connection in `extract.ts`. The extractors run the same few dozen
+queries thousands of times (one per entity, one per condition), and history replay re-reads entities
+after every op file, so preparing each query once instead of every call halves the replay time.
+
 ## History
 
 A database repo's `ops/` folder is an append-only log. The first file is a bulk import with no
@@ -134,7 +144,7 @@ build naming the differing entities. This is what guarantees a page's History se
 disagree with the entity it sits under. Entities that no longer exist are dropped from the output,
 and related links only point at entities that still exist.
 
-Per database the replay costs about one second on top of the normal compile.
+Per database the replay costs about half a second on top of the normal compile.
 
 ## Extraction
 
