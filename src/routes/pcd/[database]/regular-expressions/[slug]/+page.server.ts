@@ -3,6 +3,7 @@ import { marked } from 'marked';
 import { pickDescriptionFallback } from '$lib/shared/utils/pcd/description';
 import { pcdNamedEntityEntries } from '$lib/shared/utils/pcd/prerender.js';
 import { regularExpressionReferences } from '$lib/shared/utils/pcd/references';
+import { entityHistory } from '$lib/shared/utils/pcd/history-data';
 import { slugify } from '$lib/shared/utils/slug';
 import type { CompiledDatabase } from '$lib/types/pcd';
 import type { EntryGenerator, PageServerLoad } from './$types';
@@ -44,5 +45,11 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	const references = regularExpressionReferences(data, regex.name);
 
-	return { regex: { ...regex, noDescriptionMessage }, descriptionHtml, references, database };
+	return {
+		regex: { ...regex, noDescriptionMessage },
+		descriptionHtml,
+		references,
+		database,
+		history: entityHistory(data, 'regular_expression', regex.name)
+	};
 };

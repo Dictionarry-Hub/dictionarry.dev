@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { EntryGenerator, RequestHandler } from './$types';
+import { entityHistory } from '$lib/shared/utils/pcd/history-data';
 import { slugify } from '$lib/shared/utils/slug';
 import { mediaSettingsToMarkdown } from '$lib/shared/utils/llm/index.js';
 import type { CompiledDatabase } from '$lib/types/pcd';
@@ -49,7 +50,15 @@ export const GET: RequestHandler = ({ params }) => {
 	const settings = arrMedia.settings.find((s) => slugify(s.name) === params.slug);
 	if (!settings) error(404, 'Media settings not found');
 
-	return new Response(mediaSettingsToMarkdown(data, settings, params.arrType), {
-		headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
-	});
+	return new Response(
+		mediaSettingsToMarkdown(
+			data,
+			settings,
+			params.arrType,
+			entityHistory(data, `${params.arrType}_media_settings`, settings.name)
+		),
+		{
+			headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
+		}
+	);
 };

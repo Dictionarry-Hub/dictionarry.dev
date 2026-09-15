@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { EntryGenerator, RequestHandler } from './$types';
+import { entityHistory } from '$lib/shared/utils/pcd/history-data';
 import { slugify } from '$lib/shared/utils/slug';
 import { qualityDefinitionsToMarkdown } from '$lib/shared/utils/llm/index.js';
 import type { CompiledDatabase } from '$lib/types/pcd';
@@ -49,7 +50,15 @@ export const GET: RequestHandler = ({ params }) => {
 	const config = arrMedia.qualityDefinitions.find((q) => slugify(q.name) === params.slug);
 	if (!config) error(404, 'Quality definitions not found');
 
-	return new Response(qualityDefinitionsToMarkdown(data, config, params.arrType), {
-		headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
-	});
+	return new Response(
+		qualityDefinitionsToMarkdown(
+			data,
+			config,
+			params.arrType,
+			entityHistory(data, `${params.arrType}_quality_definitions`, config.name)
+		),
+		{
+			headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
+		}
+	);
 };

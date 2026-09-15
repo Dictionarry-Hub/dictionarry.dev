@@ -354,6 +354,8 @@ describe('buildPcdEntries', () => {
 		const database: CompiledDatabase = {
 			id: 'dictionarry',
 			name: 'Dictionarry',
+			repo: 'example/database',
+			branch: 'main',
 			version: '1.0.0',
 			schemaVersion: '1.0.0',
 			description: 'Test database',

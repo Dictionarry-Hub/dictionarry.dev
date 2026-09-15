@@ -18,6 +18,15 @@ required for crawlers to see the content.
 The rule: if a crawler needs to see it, it goes in the server load function. Anything in `onMount`
 or client-side fetch is invisible to crawlers.
 
+### Locale-dependent text
+
+Pre-rendered HTML carries whatever the build machine produced. Text that depends on the visitor's
+locale, such as `DateTime` in its `numeric` format, is rendered once at build time with the build
+machine's locale and then patched by Svelte during hydration to match the visitor. Crawlers see the
+build machine's version, which is why any such element must also expose a locale-independent value:
+`DateTime` always sets an ISO `datetime` attribute. Keep locale-dependent formatting out of titles,
+descriptions, and other metadata, which are never re-rendered.
+
 ## Dynamic Routes
 
 Routes with parameters (e.g. `/wiki/[slug]`) need SvelteKit to know which pages to generate. Two

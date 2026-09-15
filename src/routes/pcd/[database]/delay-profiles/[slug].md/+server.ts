@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { EntryGenerator, RequestHandler } from './$types';
+import { entityHistory } from '$lib/shared/utils/pcd/history-data';
 import { slugify } from '$lib/shared/utils/slug';
 import { delayProfileToMarkdown } from '$lib/shared/utils/llm/index.js';
 import type { CompiledDatabase } from '$lib/types/pcd';
@@ -40,7 +41,10 @@ export const GET: RequestHandler = ({ params }) => {
 	const profile = data.delayProfiles.find((dp) => slugify(dp.name) === params.slug);
 	if (!profile) error(404, 'Delay profile not found');
 
-	return new Response(delayProfileToMarkdown(data, profile), {
-		headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
-	});
+	return new Response(
+		delayProfileToMarkdown(data, profile, entityHistory(data, 'delay_profile', profile.name)),
+		{
+			headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
+		}
+	);
 };

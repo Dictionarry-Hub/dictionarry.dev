@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
+	import EntityHistory from '$lib/client/pcd/EntityHistory.svelte';
 	import EntityView from '$lib/client/pcd/EntityView.svelte';
 	import AdaptiveList from '$lib/client/ui/adaptive-list/AdaptiveList.svelte';
 	import Badge from '$lib/client/ui/badge/Badge.svelte';
@@ -134,5 +135,12 @@
 				{/snippet}
 			</AdaptiveList>
 		</div>
+
+		<h2
+			id="history"
+			class="mt-8 border-b border-border-muted pb-2 text-xl font-bold">
+			History
+		</h2>
+		<EntityHistory history={data.history} />
 	{/snippet}
 </EntityView>

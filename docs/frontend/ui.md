@@ -158,7 +158,9 @@ pages and the API reference.
 `src/lib/client/ui/table/types.ts`: key, header, icon, width, align, sortable). `icon` is an
 optional `{ src, alt }` image rendered before the header text. Without `cell`, table cells render
 `row[col.key]` directly. `card` renders each row's card-view content; when `href` returns a URL for
-a row, both the table row and the card become links.
+a row, both the table row and the card become links. `expanded` only reaches the table: cards never
+expand, so a card should carry its own summary of whatever the expanded row shows. A row that has
+expanded content and no `href` toggles open on click anywhere in the row, not only on its chevron.
 
 ```svelte
 <script lang="ts">
@@ -473,9 +475,11 @@ headings (`h1` to `h3`) with ids become entries, and the first `h1` (with or wit
 a title link back to `#top`. Renders nothing on pages without id'd headings. Headings carrying a
 `data-method` attribute get a color-coded HTTP method label (used by the API reference).
 
-No props. Positioning is owned by the root layout, not the component: hidden below 1280px, floated
-to the right of the content column, pinned to the viewport (`position: fixed`) with an internal
-scrollbar when taller than the viewport.
+No props. Positioning is owned by the root layout, not the component: floated to the right of the
+content column, pinned to the viewport (`position: fixed`) with an internal scrollbar when taller
+than the viewport. The content column is `max-w-3xl` for prose and `max-w-5xl` on PCD routes (tables
+and diffs); the panel is hidden below 1280px for the prose column and below 1600px for the wide one,
+where the pair would not fit beside the sidebar.
 
 ### Dropdown
 
@@ -554,13 +558,16 @@ Inline label for tags, statuses, and counts.
 
 Renders a formatted `<time>` element with a `datetime` attribute for SEO.
 
-| Prop     | Type                | Required | Default  |
-| -------- | ------------------- | -------- | -------- |
-| `date`   | `string`            | yes      |          |
-| `format` | `'short' \| 'long'` | no       | `'long'` |
+| Prop     | Type                             | Required | Default  |
+| -------- | -------------------------------- | -------- | -------- |
+| `date`   | `string`                         | yes      |          |
+| `format` | `'short' \| 'long' \| 'numeric'` | no       | `'long'` |
 
-Short format: "May 17". Long format: "May 17, 2026". Accepts ISO date strings and full ISO
-timestamps (as produced by YAML date parsing).
+Short format: "May 17". Long format: "May 17, 2026". Both are fixed to en-US. Numeric format is all
+digits in the visitor's locale ("5/17/2026" or "17/05/2026"), for dense tables; the prerendered text
+uses the build machine's locale and is patched on hydration (see the locale note in
+[seo.md](./seo.md#locale-dependent-text)). The `datetime` attribute is always ISO. Accepts ISO date
+strings and full ISO timestamps (as produced by YAML date parsing).
 
 ### Author
 

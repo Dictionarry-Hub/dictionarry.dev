@@ -162,6 +162,8 @@ function customFormat(conditions: Condition[]): CustomFormat {
 const database: CompiledDatabase = {
 	id: 'example',
 	name: 'Example',
+	repo: 'example/database',
+	branch: 'main',
 	version: '1.0.0',
 	schemaVersion: '1.0.0',
 	description: '',

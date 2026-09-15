@@ -1,16 +1,21 @@
 # PCD Pipeline
 
 Build-time pipeline that fetches PCD repositories, compiles their SQL operations, and outputs
-structured JSON for the website to consume.
+structured JSON for the website to consume: the current state of every entity, plus the change
+history of every entity derived from the same replay.
 
 ## Source
 
 ```
 tooling/pcd/
-├── index.ts        # Entry point, orchestrates fetch -> compile -> extract
+├── index.ts        # Entry point, orchestrates fetch -> replay -> extract
 ├── config.json     # Database registry
-├── fetch.ts        # GitHub tarball download and extraction
-├── build.ts        # In-memory SQLite compilation
+├── fetch.ts        # git clone and op file to commit mapping
+├── build.ts        # In-memory SQLite creation and op execution
+├── ops.ts          # Op file parser (batch header, per-op markers)
+├── diff.ts         # Structural diff between two extracted entities
+├── history.ts      # History replay fold (pure)
+├── replay.ts       # SQLite adapter for the history replay
 ├── extract.ts      # Entity extraction via SQL queries
 └── types.ts        # Pipeline-internal types
 ```
@@ -46,28 +51,37 @@ Each entry has:
 ## Pipeline Flow
 
 ```
-pnpm compile:pcd
+pnpm compile:pcd [-- --no-history]
   1. Read config.json
   2. For each database:
-     a. Fetch tarball from GitHub API
-     b. Read pcd.json manifest from extracted files
+     a. Clone the repo at its branch (blobless clone, full commit history)
+     b. Read pcd.json manifest from the checkout
      c. Resolve schema version from manifest dependencies
-     d. Fetch schema tarball (cached if same version as previous database)
+     d. Clone the schema at that version tag (cached if same version as previous database)
      e. Create in-memory SQLite with foreign keys enabled
      f. Execute schema ops in numeric filename order
-     g. Execute base ops in numeric filename order
-     h. Extract all entity data via SQL queries
-     i. Write {id}.json to src/lib/data/pcd/
+     g. Map each base op file to the commit that added it (one git log)
+     h. Replay base ops one file at a time, recording per-entity history
+     i. Extract all entity data via SQL queries and assert it matches the replay
+     j. Write {id}.json and history/{id}.json to src/lib/data/pcd/
   3. Write index.json (nav-only data for sidebar)
   4. Clean up temp directories
 ```
 
+With `--no-history`, step g and the per-file bookkeeping in h are skipped: base ops execute in one
+pass and only `{id}.json` is written. Pages and artifacts then show no History section.
+
 ## Fetching
 
-Repos are fetched as tarballs via the GitHub API
-(`https://api.github.com/repos/{owner}/{repo}/tarball/{ref}`). No git required at build time. Schema
-tarballs are cached within a pipeline run since multiple databases typically pin the same schema
-version.
+Repos are cloned with `git clone --filter=blob:none --single-branch --branch {ref}` from
+`https://github.com/{owner}/{repo}.git`. A blobless clone downloads the full commit history but only
+the checked-out tree's file contents, so one clone serves both the op files and the commit lookup.
+Git is required at build time. Schema clones are cached within a pipeline run since multiple
+databases typically pin the same schema version.
+
+Commit metadata comes from one `git log --name-only --diff-filter=A -- ops` per repo, mapping each
+op file to the commit that added it (hash, author date, subject). An op file with no matching commit
+falls back to its `@exportedAt` header and no commit link.
 
 ## Schema Resolution
 
@@ -87,6 +101,41 @@ numeric filename prefix (`0.schema.sql` before `1.languages.sql` before `10.some
 
 No custom SQLite functions are needed. Exported PCD ops use plain SQL with name-based WHERE clauses.
 
+## History
+
+A database repo's `ops/` folder is an append-only log. The first file is a bulk import with no
+markers. Every later file is one Profilarr export batch (in practice one commit) with a header
+(`-- @name:`, `-- @exportedAt:`, `-- @opIds:`) and each op wrapped in markers naming the entity it
+touches:
+
+```sql
+-- --- BEGIN op 3587 ( update regular_expression "Special Edition" )
+update "regular_expressions" set "pattern" = '...' where "name" = 'Special Edition';
+-- --- END op 3587
+```
+
+`ops.ts` parses a file into its header, ops (verb, entity type, name, SQL) and, per op, the other
+same-type names the SQL mentions (the old name in a rename's WHERE clause). Test entities
+(`test_entity`, `test_release`) are ignored: the site does not extract them.
+
+`history.ts` replays the files in order. After each file it re-reads only the entities the markers
+touched, using the per-type extractors in `extract.ts` with a name filter, and diffs each against
+its previous state (`diff.ts`, which matches array items by name so a changed condition reads as one
+change). The kind of each entry comes from the state transition, not the marker verb: absent then
+present is `created`, present then absent is `deleted`, both present is `updated`. An entity that
+appeared while exactly one name its ops mention disappeared is a `renamed` entry, and the old name's
+history moves under the new name; chains through temporary names inside one file resolve to the
+original. When a regex or custom format disappears, the custom formats or profiles that referenced
+it are re-read too, so cascades are attributed to the file that caused them. A file with no markers
+(the bulk import) or an unlabeled op is diffed in full instead, with no related links.
+
+After the last file, a full extraction must deep-equal the replayed state. A mismatch fails the
+build naming the differing entities. This is what guarantees a page's History section can never
+disagree with the entity it sits under. Entities that no longer exist are dropped from the output,
+and related links only point at entities that still exist.
+
+Per database the replay costs about one second on top of the normal compile.
+
 ## Extraction
 
 After compilation, the pipeline queries the SQLite database for each entity type with appropriate
@@ -105,13 +154,21 @@ database. These are consumed by `+page.server.ts` load functions for entity deta
 `+layout.server.ts` to populate the sidebar. Kept separate to avoid shipping full entity data to
 every page.
 
+**Per-database history** (`history/{id}.json`): `EntityHistory` from `src/lib/types/pcd.ts`, keyed
+by `{entityType}:{name}` (entity types as they appear in op markers, e.g. `custom_format`,
+`radarr_naming`), each a list of `HistoryEntry` in replay order. Lives in its own folder so the
+routes' `pcd/*.json` database globs never see it. Loaded by
+`src/lib/shared/utils/pcd/history-data.ts`, which tolerates the folder being absent.
+
 ## Shared Types
 
 `src/lib/types/pcd.ts` defines the compiled data shape, used by both the pipeline and the SvelteKit
 app. `CompiledDatabase` retains both the database manifest version and its pinned schema dependency
 version. Key interfaces:
 
-- `CompiledDatabase` - top-level container with metadata and all entity collections
+- `CompiledDatabase` - top-level container with metadata (including the source `repo` and `branch`,
+  used for commit links) and all entity collections
+- `EntityHistory`, `HistoryEntry`, `EntityChange` - the per-entity change log
 - `CustomFormat` - name, description, tags, conditions (with discriminated union for condition data)
 - `QualityProfile` - name, scoring, quality list with groups, languages
 - `RegularExpression` - name, pattern, description, tags

@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { EntryGenerator, RequestHandler } from './$types';
+import { entityHistory } from '$lib/shared/utils/pcd/history-data';
 import { slugify } from '$lib/shared/utils/slug';
 import { regexToMarkdown } from '$lib/shared/utils/llm/index.js';
 import type { CompiledDatabase } from '$lib/types/pcd';
@@ -40,7 +41,10 @@ export const GET: RequestHandler = ({ params }) => {
 	const regex = data.regularExpressions.find((re) => slugify(re.name) === params.slug);
 	if (!regex) error(404, 'Regular expression not found');
 
-	return new Response(regexToMarkdown(data, regex), {
-		headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
-	});
+	return new Response(
+		regexToMarkdown(data, regex, entityHistory(data, 'regular_expression', regex.name)),
+		{
+			headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
+		}
+	);
 };

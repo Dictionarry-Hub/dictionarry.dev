@@ -6,16 +6,21 @@ import {
 	fetchSchema,
 	resolveSchemaVersion,
 	getOpsDir,
+	opFileCommits,
 	cleanupTempDirs
 } from './fetch.js';
-import { compileDatabase } from './build.js';
+import { compileDatabase, createDatabase } from './build.js';
 import { extractDatabase } from './extract.js';
+import { replayWithHistory } from './replay.js';
+import type { EntityHistory } from './history.js';
 import { slugify } from '../../src/lib/shared/utils/slug.js';
 import type { PcdConfig, PcdManifest } from './types.js';
+import type { CompiledDatabase } from '../../src/lib/types/pcd.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '../..');
 const outputDir = join(projectRoot, 'src/lib/data/pcd');
+const historyDir = join(outputDir, 'history');
 
 interface NavEntry {
 	name: string;
@@ -78,12 +83,18 @@ function checkSlugCollisions(navIndex: NavIndex): SlugCollision[] {
 	return collisions;
 }
 
+// Usage:
+//   pnpm compile:pcd                 compile entities and per-entity history
+//   pnpm compile:pcd -- --no-history compile entities only
 function main(): void {
+	const withHistory = !process.argv.includes('--no-history');
 	const config: PcdConfig = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf-8'));
 
 	mkdirSync(outputDir, { recursive: true });
 
-	console.log(`Compiling ${config.databases.length} PCD databases...\n`);
+	console.log(
+		`Compiling ${config.databases.length} PCD databases${withHistory ? ' with history' : ''}...\n`
+	);
 
 	const navIndex: NavIndex = {};
 
@@ -99,17 +110,39 @@ function main(): void {
 		const { repo: schemaRepo, version: schemaVersion } = resolveSchemaVersion(manifest);
 		const schemaPath = fetchSchema(schemaRepo, schemaVersion);
 
-		// Compile: schema ops then base ops
+		// Compile: schema ops then base ops. With history on, base ops replay
+		// one file at a time and the entity state comes out of the same pass.
 		const schemaOpsDir = getOpsDir(schemaPath);
 		const baseOpsDir = getOpsDir(repoPath);
-		const db = compileDatabase(schemaOpsDir, baseOpsDir);
+		let compiled: CompiledDatabase;
+		let history: EntityHistory | null = null;
 
-		// Extract and write
-		const compiled = extractDatabase(db, entry, manifest, schemaVersion);
-		const outputPath = join(outputDir, `${entry.id}.json`);
-		writeFileSync(outputPath, JSON.stringify(compiled, null, 2));
+		if (withHistory) {
+			const db = createDatabase(schemaOpsDir);
+			const commits = opFileCommits(repoPath);
+			const result = replayWithHistory(
+				db,
+				baseOpsDir,
+				commits,
+				entry,
+				manifest,
+				schemaVersion
+			);
+			db.close();
+			compiled = result.compiled;
+			history = result.history;
+		} else {
+			const db = compileDatabase(schemaOpsDir, baseOpsDir);
+			compiled = extractDatabase(db, entry, manifest, schemaVersion);
+			db.close();
+		}
 
-		db.close();
+		writeFileSync(join(outputDir, `${entry.id}.json`), JSON.stringify(compiled, null, 2));
+		if (history !== null) {
+			// Own folder so the routes' `pcd/*.json` database globs never see it.
+			mkdirSync(historyDir, { recursive: true });
+			writeFileSync(join(historyDir, `${entry.id}.json`), JSON.stringify(history));
+		}
 
 		// Collect nav data
 		const mediaEntries = (arrType: 'radarr' | 'sonarr') => ({
@@ -134,8 +167,12 @@ function main(): void {
 		};
 
 		const elapsed = (performance.now() - start).toFixed(0);
+		const historyCount =
+			history === null
+				? ''
+				: `, ${Object.values(history).reduce((n, entries) => n + entries.length, 0)} history entries`;
 		console.log(
-			`    -> ${compiled.customFormats.length} CFs, ${compiled.qualityProfiles.length} QPs, ${compiled.regularExpressions.length} regexes (${elapsed}ms)`
+			`    -> ${compiled.customFormats.length} CFs, ${compiled.qualityProfiles.length} QPs, ${compiled.regularExpressions.length} regexes${historyCount} (${elapsed}ms)`
 		);
 	}
 

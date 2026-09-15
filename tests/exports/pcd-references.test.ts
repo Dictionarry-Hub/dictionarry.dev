@@ -41,6 +41,8 @@ function database(overrides: Partial<CompiledDatabase> = {}): CompiledDatabase {
 	return {
 		id: 'example',
 		name: 'Example',
+		repo: 'example/database',
+		branch: 'main',
 		version: '1.0.0',
 		schemaVersion: '1.0.0',
 		description: '',

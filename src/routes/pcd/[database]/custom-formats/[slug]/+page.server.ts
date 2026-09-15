@@ -4,6 +4,7 @@ import { sortConditions } from '$lib/shared/utils/pcd/conditions';
 import { pickDescriptionFallback } from '$lib/shared/utils/pcd/description';
 import { customFormatProfileReferences } from '$lib/shared/utils/pcd/references';
 import { pcdNamedEntityEntries } from '$lib/shared/utils/pcd/prerender.js';
+import { entityHistory } from '$lib/shared/utils/pcd/history-data';
 import { slugify } from '$lib/shared/utils/slug';
 import type { CompiledDatabase } from '$lib/types/pcd';
 import type { EntryGenerator, PageServerLoad } from './$types';
@@ -65,6 +66,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	return {
 		format: { ...format, conditions, noDescriptionMessage },
 		descriptionHtml,
-		references
+		references,
+		history: entityHistory(data, 'custom_format', format.name)
 	};
 };
