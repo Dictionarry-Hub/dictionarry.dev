@@ -155,9 +155,10 @@ pages and the API reference.
 | `expanded` | `Snippet<[row: T]>`                    | no                 |              |
 
 `columns`, `href`, `cell`, and `expanded` pass through to `Table` (`Column` comes from
-`src/lib/client/ui/table/types.ts`: key, header, width, align, sortable). Without `cell`, table
-cells render `row[col.key]` directly. `card` renders each row's card-view content; when `href`
-returns a URL for a row, both the table row and the card become links.
+`src/lib/client/ui/table/types.ts`: key, header, icon, width, align, sortable). `icon` is an
+optional `{ src, alt }` image rendered before the header text. Without `cell`, table cells render
+`row[col.key]` directly. `card` renders each row's card-view content; when `href` returns a URL for
+a row, both the table row and the card become links.
 
 ```svelte
 <script lang="ts">

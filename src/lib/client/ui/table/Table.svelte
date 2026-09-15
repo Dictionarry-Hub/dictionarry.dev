@@ -91,6 +91,16 @@
 	</div>
 {/if}
 
+{#snippet headerLabel(col: Column<T>)}
+	{#if col.icon}
+		<img
+			src={col.icon.src}
+			alt={col.icon.alt}
+			class="size-4" />
+	{/if}
+	{col.header}
+{/snippet}
+
 <!-- lint-disable no-raw-ui -->
 <div class="overflow-hidden rounded-card border border-border bg-surface-muted shadow-card">
 	<table class="w-full border-collapse text-sm">
@@ -108,7 +118,7 @@
 								type="button"
 								class="inline-flex items-center gap-1 transition-colors hover:text-text"
 								onclick={() => toggleSort(col.key)}>
-								{col.header}
+								{@render headerLabel(col)}
 								{#if sortKey === col.key}
 									{#if sortDir === 'asc'}
 										<ChevronUp size={14} />
@@ -118,7 +128,9 @@
 								{/if}
 							</button>
 						{:else}
-							{col.header}
+							<span class="inline-flex items-center gap-1">
+								{@render headerLabel(col)}
+							</span>
 						{/if}
 					</th>
 				{/each}

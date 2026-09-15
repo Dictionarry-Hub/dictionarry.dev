@@ -33,10 +33,33 @@
 	let { data } = $props();
 	const format = $derived(data.format);
 	const descriptionHtml = $derived(data.descriptionHtml);
-	const references = $derived(data.references);
-	const referenceColumns: Column<QualityProfileReference>[] = [
+
+	interface ReferenceRow extends QualityProfileReference {
+		radarrScore: number | null;
+		sonarrScore: number | null;
+	}
+
+	const references = $derived.by((): ReferenceRow[] =>
+		data.references.map((reference) => ({
+			...reference,
+			radarrScore: reference.scores.radarr,
+			sonarrScore: reference.scores.sonarr
+		}))
+	);
+	const referenceColumns: Column<ReferenceRow>[] = [
 		{ key: 'name', header: 'Quality Profile', sortable: true },
-		{ key: 'scores', header: 'Score' }
+		{
+			key: 'radarrScore',
+			header: 'Score',
+			icon: { src: '/radarr.svg', alt: 'Radarr' },
+			sortable: true
+		},
+		{
+			key: 'sonarrScore',
+			header: 'Score',
+			icon: { src: '/sonarr.svg', alt: 'Sonarr' },
+			sortable: true
+		}
 	];
 
 	interface ConditionRow {
@@ -177,6 +200,14 @@
 	<span class="text-sm font-medium tabular-nums {scoreClass(score)}">
 		{formatProfileScore(score)}
 	</span>
+{/snippet}
+
+{#snippet scoreCell(score: number | null)}
+	{#if score === null}
+		<span class="text-sm text-text-muted">-</span>
+	{:else}
+		{@render scoreValue(score)}
+	{/if}
 {/snippet}
 
 {#snippet scoreList(reference: QualityProfileReference)}
@@ -339,8 +370,10 @@
 						{#snippet cell(row, column)}
 							{#if column.key === 'name'}
 								<span class="font-medium">{row.name}</span>
-							{:else if column.key === 'scores'}
-								{@render scoreList(row)}
+							{:else if column.key === 'radarrScore'}
+								{@render scoreCell(row.radarrScore)}
+							{:else if column.key === 'sonarrScore'}
+								{@render scoreCell(row.sonarrScore)}
 							{/if}
 						{/snippet}
 						{#snippet card(row)}
