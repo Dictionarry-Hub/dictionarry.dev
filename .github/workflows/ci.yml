@@ -47,6 +47,7 @@ jobs:
                   cache: 'pnpm'
             - run: pnpm install --frozen-lockfile
             - run: pnpm compile:api
+            - run: pnpm compile:pcd
             - run: pnpm build
             - run: pnpm lint
 
@@ -64,6 +65,7 @@ jobs:
                   cache: 'pnpm'
             - run: pnpm install --frozen-lockfile
             - run: pnpm compile:api
+            - run: pnpm compile:pcd
             - run: pnpm check
 
     test:
@@ -96,4 +98,5 @@ jobs:
                   cache: 'pnpm'
             - run: pnpm install --frozen-lockfile
             - run: pnpm compile:api
+            - run: pnpm compile:pcd
             - run: pnpm build
