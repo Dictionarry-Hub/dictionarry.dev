@@ -81,10 +81,18 @@
 
 	const colCount = $derived(columns.length + (expanded ? 1 : 0));
 
-	function rowClick(row: T) {
-		if (!href) return;
-		const url = href(row);
-		if (url) goto(url);
+	// A linked row navigates; otherwise an expandable row toggles.
+	function rowClick(row: T, index: number) {
+		const url = href?.(row);
+		if (url) {
+			goto(url);
+			return;
+		}
+		toggleExpand(index);
+	}
+
+	function isInteractive(row: T, index: number): boolean {
+		return Boolean(href?.(row)) || expandableSet.has(index);
 	}
 </script>
 
@@ -149,10 +157,10 @@
 		<tbody>
 			{#each sorted as row, idx (idx)}
 				<tr
-					class="border-b border-border-subtle last:border-b-0 {href?.(row)
+					class="border-b border-border-subtle last:border-b-0 {isInteractive(row, idx)
 						? 'cursor-pointer transition-colors hover:bg-surface-hover'
 						: ''}"
-					onclick={() => rowClick(row)}>
+					onclick={() => rowClick(row, idx)}>
 					{#each columns as col (col.key)}
 						<td
 							class="px-4 py-3 {col.align === 'center'
