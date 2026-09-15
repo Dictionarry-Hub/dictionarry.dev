@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { EntryGenerator, RequestHandler } from './$types';
 import { customFormatToMarkdown } from '$lib/shared/utils/llm/index.js';
+import { entityHistory } from '$lib/shared/utils/pcd/history-data';
 import { slugify } from '$lib/shared/utils/slug';
 import type { CompiledDatabase } from '$lib/types/pcd';
 
@@ -35,7 +36,10 @@ export const GET: RequestHandler = ({ params }) => {
 	);
 	if (!format) error(404, 'Custom format not found');
 
-	return new Response(customFormatToMarkdown(data, format), {
-		headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
-	});
+	return new Response(
+		customFormatToMarkdown(data, format, entityHistory(data, 'custom_format', format.name)),
+		{
+			headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
+		}
+	);
 };

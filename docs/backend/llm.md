@@ -200,6 +200,11 @@ entity pages and the serializers, so page and artifact cannot drift apart.
   sizes in megabytes per minute (the native arr unit; the HTML page's unit dropdown is
   display-only). A max of 0, or at or above the arr's slider cap (2000 for Radarr, 1000 for Sonarr),
   renders as `Unlimited`.
+- **History** (every type): `## History` with a `| Commit | Change | Date |` table, newest first,
+  the commit linked to GitHub and the change title suffixed with the kind when it is not a plain
+  update (`Created`, `Renamed`). Field-level diffs stay on the page. Omitted when the entity has no
+  compiled history. Kind labels and links come from `src/lib/shared/utils/pcd/history.ts`, shared
+  with the page's History section.
 
 Only detail pages have mirrors. The entity list pages do not, so `/pcd/*` stays in the lint rule's
 `pending` list and the detail artifacts are guaranteed by their own build instead: entries derive

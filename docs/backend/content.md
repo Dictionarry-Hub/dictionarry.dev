@@ -28,6 +28,13 @@ Custom format pages also list the quality profiles that score them. References r
 application-specific scoring into effective Radarr and Sonarr scores and appear in both HTML and
 Markdown representations.
 
+Every detail page except quality profiles ends with a History section: one row per commit that
+touched the entity (commit link, change title, date), expandable to the field-level diff and links
+to the other entities changed in the same commit. History is compiled from the PCD repo's op log by
+the pipeline (see [tooling/pcd.md](../tooling/pcd.md#history)); the section is empty when the
+pipeline ran with `--no-history`. Below the `lg` breakpoint the rows render as cards with a change
+count instead of the expandable diff.
+
 Seven entity types are browsable:
 
 | Entity Type         | Route segment         | Arr-specific |
@@ -82,7 +89,7 @@ The PCD pipeline is a pre-build step (`pnpm compile:pcd`) that fetches PCD repos
 their SQL operations into SQLite, and extracts entity state as JSON. For implementation details, see
 [tooling/pcd.md](../tooling/pcd.md).
 
-The pipeline outputs two things:
+The pipeline outputs three things:
 
 1. **Per-database JSON** (`src/lib/data/pcd/{id}.json`) containing full entity data, typed as
    `CompiledDatabase` from `src/lib/types/pcd.ts`. Consumed by `+page.server.ts` load functions.
@@ -90,7 +97,11 @@ The pipeline outputs two things:
 2. **Nav index** (`src/lib/data/pcd/index.json`) containing entity names per database. Consumed by
    `+layout.server.ts` to populate the sidebar navigation.
 
-Both outputs are gitignored. The build command is `pnpm compile:pcd && pnpm build`.
+3. **Per-database history** (`src/lib/data/pcd/history/{id}.json`) containing each entity's change
+   log. Consumed by `src/lib/shared/utils/pcd/history-data.ts` for the detail pages and markdown
+   artifacts. Skipped with `pnpm compile:pcd -- --no-history`.
+
+All outputs are gitignored. The build command is `pnpm compile:pcd && pnpm build`.
 
 ## Database Selection
 

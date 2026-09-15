@@ -29,15 +29,20 @@ import {
 	formatConditionArrType,
 	formatConditionValue
 } from '$lib/shared/utils/pcd/format';
+import { formatHistoryKind, type EntityHistoryItem } from '$lib/shared/utils/pcd/history';
 import { SITE_URL } from './site.js';
-import { join, fence } from './md.js';
+import { join, fence, isoDate } from './md.js';
 
 // Markdown serializers for PCD entity artifacts. PCD entities are structured
 // data compiled from PCD repositories, so these are API-style serializers
 // consuming the same CompiledDatabase JSON the entity pages render, not
 // mdsvex pass-throughs. See docs/backend/llm.md.
 
-export function regexToMarkdown(data: CompiledDatabase, regex: RegularExpression): string {
+export function regexToMarkdown(
+	data: CompiledDatabase,
+	regex: RegularExpression,
+	history: EntityHistoryItem[] = []
+): string {
 	const slug = slugify(regex.name);
 
 	const context = [
@@ -58,11 +63,16 @@ export function regexToMarkdown(data: CompiledDatabase, regex: RegularExpression
 		regex.regex101Id ? `Test this pattern at https://regex101.com/r/${regex.regex101Id}.` : '',
 		regex.description ? join(['## Description', regex.description]) : '',
 		'## References',
-		referencesSection(data.id, references)
+		referencesSection(data.id, references),
+		historySection(history)
 	]);
 }
 
-export function customFormatToMarkdown(data: CompiledDatabase, format: CustomFormat): string {
+export function customFormatToMarkdown(
+	data: CompiledDatabase,
+	format: CustomFormat,
+	history: EntityHistoryItem[] = []
+): string {
 	const slug = slugify(format.name);
 	const context = [
 		`A custom format from the ${data.name} PCD database.`,
@@ -107,11 +117,16 @@ export function customFormatToMarkdown(data: CompiledDatabase, format: CustomFor
 		conditions.length > 0 ? conditions.join('\n\n') : 'No conditions.',
 		tests.length > 0 ? join(['## Tests', tests.join('\n\n')]) : '',
 		'## References',
-		qualityProfileReferencesSection(data.id, references)
+		qualityProfileReferencesSection(data.id, references),
+		historySection(history)
 	]);
 }
 
-export function delayProfileToMarkdown(data: CompiledDatabase, profile: DelayProfile): string {
+export function delayProfileToMarkdown(
+	data: CompiledDatabase,
+	profile: DelayProfile,
+	history: EntityHistoryItem[] = []
+): string {
 	const slug = slugify(profile.name);
 
 	const rows: [string, string][] = [
@@ -137,11 +152,16 @@ export function delayProfileToMarkdown(data: CompiledDatabase, profile: DelayPro
 		`A delay profile from the ${data.name} PCD database. ` +
 			`Web version: ${SITE_URL}/pcd/${data.id}/delay-profiles/${slug}`,
 		'## Configuration',
-		settingsTable(rows)
+		settingsTable(rows),
+		historySection(history)
 	]);
 }
 
-export function namingConfigToMarkdown(data: CompiledDatabase, naming: NamingConfig): string {
+export function namingConfigToMarkdown(
+	data: CompiledDatabase,
+	naming: NamingConfig,
+	history: EntityHistoryItem[] = []
+): string {
 	const slug = slugify(naming.name);
 
 	const rows: [string, string][] = [
@@ -178,14 +198,16 @@ export function namingConfigToMarkdown(data: CompiledDatabase, naming: NamingCon
 		'## Configuration',
 		settingsTable(rows),
 		'## Naming Scheme',
-		...formatSections
+		...formatSections,
+		historySection(history)
 	]);
 }
 
 export function mediaSettingsToMarkdown(
 	data: CompiledDatabase,
 	settings: MediaSettings,
-	arrType: string
+	arrType: string,
+	history: EntityHistoryItem[] = []
 ): string {
 	const slug = slugify(settings.name);
 
@@ -199,14 +221,16 @@ export function mediaSettingsToMarkdown(
 		`${arrLabel(arrType)} media management settings from the ${data.name} PCD database. ` +
 			`Web version: ${SITE_URL}/pcd/${data.id}/media-settings/${arrType}/${slug}`,
 		'## Configuration',
-		settingsTable(rows)
+		settingsTable(rows),
+		historySection(history)
 	]);
 }
 
 export function qualityDefinitionsToMarkdown(
 	data: CompiledDatabase,
 	config: QualityDefinitionConfig,
-	arrType: string
+	arrType: string,
+	history: EntityHistoryItem[] = []
 ): string {
 	const slug = slugify(config.name);
 
@@ -225,7 +249,28 @@ export function qualityDefinitionsToMarkdown(
 			'| Quality | Min | Preferred | Max |',
 			'| ------- | --- | --------- | --- |',
 			...tierRows
-		].join('\n')
+		].join('\n'),
+		historySection(history)
+	]);
+}
+
+// Mirrors the page's History section: one row per op file (a Profilarr
+// export batch, one commit), newest first. Field diffs stay on the page.
+function historySection(history: EntityHistoryItem[]): string {
+	if (history.length === 0) return '';
+
+	const rows = history.map((item) => {
+		const commit = item.commitUrl ? `[${item.shortHash}](${item.commitUrl})` : `#${item.op}`;
+		const change =
+			item.kind === 'updated'
+				? item.title
+				: `${item.title} (${formatHistoryKind(item.kind)})`;
+		return `| ${commit} | ${change.replace(/\|/g, '\\|')} | ${item.date ? isoDate(item.date) : ''} |`;
+	});
+
+	return join([
+		'## History',
+		['| Commit | Change | Date |', '| ------ | ------ | ---- |', ...rows].join('\n')
 	]);
 }
 

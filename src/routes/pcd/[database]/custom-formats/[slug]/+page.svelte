@@ -15,6 +15,7 @@
 		Users
 	} from '@lucide/svelte';
 	import type { Component } from 'svelte';
+	import EntityHistory from '$lib/client/pcd/EntityHistory.svelte';
 	import EntityView from '$lib/client/pcd/EntityView.svelte';
 	import AdaptiveList from '$lib/client/ui/adaptive-list/AdaptiveList.svelte';
 	import Badge from '$lib/client/ui/badge/Badge.svelte';
@@ -387,6 +388,15 @@
 					No quality profiles reference this custom format.
 				</p>
 			{/if}
+		</section>
+
+		<section aria-labelledby="history">
+			<h2
+				id="history"
+				class="mt-8 border-b border-border-muted pb-2 text-xl font-bold">
+				History
+			</h2>
+			<EntityHistory history={data.history} />
 		</section>
 	{/snippet}
 </EntityView>

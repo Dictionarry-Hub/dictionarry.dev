@@ -3,6 +3,10 @@
 export interface CompiledDatabase {
 	id: string;
 	name: string;
+	/** GitHub owner/repo the ops were compiled from. */
+	repo: string;
+	/** Git ref the ops were compiled from. */
+	branch: string;
 	version: string;
 	schemaVersion: string;
 	description: string;
@@ -212,3 +216,38 @@ export interface QualityDefinitionTier {
 	maxSize: number;
 	preferredSize: number;
 }
+
+// --- History ---
+// Produced by the pipeline's history replay (tooling/pcd/history.ts) and
+// written to src/lib/data/pcd/{id}.history.json.
+
+export interface EntityChange {
+	/** Dotted path with keyed array items, e.g. conditions[Extras].data.regularExpressionName */
+	path: string;
+	kind: 'added' | 'removed' | 'changed';
+	from?: unknown;
+	to?: unknown;
+}
+
+export interface EntityRef {
+	entityType: string;
+	name: string;
+}
+
+export interface HistoryEntry {
+	/** Op file number. */
+	op: number;
+	title: string;
+	/** Commit date, or the export timestamp when no commit is known. ISO 8601. */
+	date: string;
+	/** Full commit sha, or null when the file has no known commit. */
+	hash: string | null;
+	kind: 'created' | 'updated' | 'deleted' | 'renamed';
+	renamedFrom?: string;
+	changes: EntityChange[];
+	/** Other entities touched in the same op file. */
+	related: EntityRef[];
+}
+
+/** Keyed by `${entityType}:${name}`. Entries are in replay order (oldest first). */
+export type EntityHistory = Record<string, HistoryEntry[]>;

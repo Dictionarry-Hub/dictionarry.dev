@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { pcdNamedEntityEntries } from '$lib/shared/utils/pcd/prerender.js';
+import { entityHistory } from '$lib/shared/utils/pcd/history-data';
 import { slugify } from '$lib/shared/utils/slug';
 import type { CompiledDatabase } from '$lib/types/pcd';
 import type { EntryGenerator, PageServerLoad } from './$types';
@@ -22,5 +23,5 @@ export const load: PageServerLoad = async ({ params }) => {
 		error(404, 'Delay profile not found');
 	}
 
-	return { profile, database };
+	return { profile, database, history: entityHistory(data, 'delay_profile', profile.name) };
 };

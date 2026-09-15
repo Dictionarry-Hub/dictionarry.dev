@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { pcdArrEntityEntries } from '$lib/shared/utils/pcd/prerender.js';
+import { entityHistory } from '$lib/shared/utils/pcd/history-data';
 import { slugify } from '$lib/shared/utils/slug';
 import type { CompiledDatabase } from '$lib/types/pcd';
 import type { EntryGenerator, PageServerLoad } from './$types';
@@ -27,5 +28,9 @@ export const load: PageServerLoad = async ({ params }) => {
 		error(404, 'Media settings not found');
 	}
 
-	return { settings, database };
+	return {
+		settings,
+		database,
+		history: entityHistory(data, `${arrType}_media_settings`, settings.name)
+	};
 };

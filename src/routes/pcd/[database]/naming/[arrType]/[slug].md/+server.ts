@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { EntryGenerator, RequestHandler } from './$types';
+import { entityHistory } from '$lib/shared/utils/pcd/history-data';
 import { slugify } from '$lib/shared/utils/slug';
 import { namingConfigToMarkdown } from '$lib/shared/utils/llm/index.js';
 import type { CompiledDatabase } from '$lib/types/pcd';
@@ -49,7 +50,14 @@ export const GET: RequestHandler = ({ params }) => {
 	const naming = arrMedia.naming.find((n) => slugify(n.name) === params.slug);
 	if (!naming) error(404, 'Naming config not found');
 
-	return new Response(namingConfigToMarkdown(data, naming), {
-		headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
-	});
+	return new Response(
+		namingConfigToMarkdown(
+			data,
+			naming,
+			entityHistory(data, `${params.arrType}_naming`, naming.name)
+		),
+		{
+			headers: { 'Content-Type': 'text/markdown; charset=utf-8' }
+		}
+	);
 };

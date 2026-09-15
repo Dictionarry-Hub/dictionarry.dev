@@ -47,6 +47,8 @@ export function extractDatabase(
 	return {
 		id: entry.id,
 		name: entry.name,
+		repo: entry.repo,
+		branch: entry.branch,
 		version: manifest.version,
 		schemaVersion,
 		description: manifest.description,
@@ -72,10 +74,12 @@ export function extractDatabase(
 
 // --- Custom Formats ---
 
-function extractCustomFormats(db: Database.Database): CustomFormat[] {
+export function extractCustomFormats(db: Database.Database, name?: string): CustomFormat[] {
 	const rows = db
-		.prepare('SELECT name, description, include_in_rename FROM custom_formats ORDER BY name')
-		.all() as {
+		.prepare(
+			`SELECT name, description, include_in_rename FROM custom_formats ${nameFilter(name)} ORDER BY name`
+		)
+		.all(...nameArgs(name)) as {
 		name: string;
 		description: string | null;
 		include_in_rename: number;
@@ -253,14 +257,14 @@ function extractTests(db: Database.Database, cfName: string): CustomFormatTest[]
 
 // --- Quality Profiles ---
 
-function extractQualityProfiles(db: Database.Database): QualityProfile[] {
+export function extractQualityProfiles(db: Database.Database, name?: string): QualityProfile[] {
 	const rows = db
 		.prepare(
 			`SELECT name, description, upgrades_allowed, minimum_custom_format_score,
 			        upgrade_until_score, upgrade_score_increment
-			 FROM quality_profiles ORDER BY name`
+			 FROM quality_profiles ${nameFilter(name)} ORDER BY name`
 		)
-		.all() as {
+		.all(...nameArgs(name)) as {
 		name: string;
 		description: string | null;
 		upgrades_allowed: number;
@@ -362,12 +366,15 @@ function extractProfileScoring(db: Database.Database, profileName: string): Prof
 
 // --- Regular Expressions ---
 
-function extractRegularExpressions(db: Database.Database): RegularExpression[] {
+export function extractRegularExpressions(
+	db: Database.Database,
+	name?: string
+): RegularExpression[] {
 	const rows = db
 		.prepare(
-			'SELECT name, pattern, description, regex101_id FROM regular_expressions ORDER BY name'
+			`SELECT name, pattern, description, regex101_id FROM regular_expressions ${nameFilter(name)} ORDER BY name`
 		)
-		.all() as {
+		.all(...nameArgs(name)) as {
 		name: string;
 		pattern: string;
 		description: string | null;
@@ -385,15 +392,15 @@ function extractRegularExpressions(db: Database.Database): RegularExpression[] {
 
 // --- Delay Profiles ---
 
-function extractDelayProfiles(db: Database.Database): DelayProfile[] {
+export function extractDelayProfiles(db: Database.Database, name?: string): DelayProfile[] {
 	const rows = db
 		.prepare(
 			`SELECT name, preferred_protocol, usenet_delay, torrent_delay,
 			        bypass_if_highest_quality, bypass_if_above_custom_format_score,
 			        minimum_custom_format_score
-			 FROM delay_profiles ORDER BY name`
+			 FROM delay_profiles ${nameFilter(name)} ORDER BY name`
 		)
-		.all() as {
+		.all(...nameArgs(name)) as {
 		name: string;
 		preferred_protocol: string;
 		usenet_delay: number | null;
@@ -416,7 +423,11 @@ function extractDelayProfiles(db: Database.Database): DelayProfile[] {
 
 // --- Media Management ---
 
-function extractNaming(db: Database.Database, arrType: 'radarr' | 'sonarr'): NamingConfig[] {
+export function extractNaming(
+	db: Database.Database,
+	arrType: 'radarr' | 'sonarr',
+	name?: string
+): NamingConfig[] {
 	const table = `${arrType}_naming`;
 
 	if (arrType === 'radarr') {
@@ -424,9 +435,9 @@ function extractNaming(db: Database.Database, arrType: 'radarr' | 'sonarr'): Nam
 			.prepare(
 				`SELECT name, rename, movie_format, movie_folder_format,
 				        replace_illegal_characters, colon_replacement_format
-				 FROM ${table} ORDER BY name`
+				 FROM ${table} ${nameFilter(name)} ORDER BY name`
 			)
-			.all() as {
+			.all(...nameArgs(name)) as {
 			name: string;
 			rename: number;
 			movie_format: string;
@@ -454,9 +465,9 @@ function extractNaming(db: Database.Database, arrType: 'radarr' | 'sonarr'): Nam
 			        anime_episode_format, series_folder_format, season_folder_format,
 			        replace_illegal_characters, colon_replacement_format,
 			        custom_colon_replacement_format, multi_episode_style
-			 FROM ${table} ORDER BY name`
+			 FROM ${table} ${nameFilter(name)} ORDER BY name`
 		)
-		.all() as {
+		.all(...nameArgs(name)) as {
 		name: string;
 		rename: number;
 		standard_episode_format: string;
@@ -488,15 +499,18 @@ function extractNaming(db: Database.Database, arrType: 'radarr' | 'sonarr'): Nam
 	}));
 }
 
-function extractMediaSettings(
+export function extractMediaSettings(
 	db: Database.Database,
-	arrType: 'radarr' | 'sonarr'
+	arrType: 'radarr' | 'sonarr',
+	name?: string
 ): MediaSettings[] {
 	const table = `${arrType}_media_settings`;
 
 	const rows = db
-		.prepare(`SELECT name, propers_repacks, enable_media_info FROM ${table} ORDER BY name`)
-		.all() as {
+		.prepare(
+			`SELECT name, propers_repacks, enable_media_info FROM ${table} ${nameFilter(name)} ORDER BY name`
+		)
+		.all(...nameArgs(name)) as {
 		name: string;
 		propers_repacks: string;
 		enable_media_info: number;
@@ -509,13 +523,16 @@ function extractMediaSettings(
 	}));
 }
 
-function extractQualityDefinitions(
+export function extractQualityDefinitions(
 	db: Database.Database,
-	arrType: 'radarr' | 'sonarr'
+	arrType: 'radarr' | 'sonarr',
+	name?: string
 ): QualityDefinitionConfig[] {
 	const table = `${arrType}_quality_definitions`;
 
-	const names = db.prepare(`SELECT DISTINCT name FROM ${table} ORDER BY name`).all() as {
+	const names = db
+		.prepare(`SELECT DISTINCT name FROM ${table} ${nameFilter(name)} ORDER BY name`)
+		.all(...nameArgs(name)) as {
 		name: string;
 	}[];
 
@@ -547,6 +564,16 @@ function extractQualityDefinitions(
 }
 
 // --- Shared ---
+
+// Optional single-entity filter so history replay can re-read one entity
+// instead of the whole table.
+function nameFilter(name: string | undefined): string {
+	return name === undefined ? '' : 'WHERE name = ?';
+}
+
+function nameArgs(name: string | undefined): string[] {
+	return name === undefined ? [] : [name];
+}
 
 function extractTags(
 	db: Database.Database,
