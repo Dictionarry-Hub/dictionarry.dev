@@ -4,13 +4,8 @@
 	import Badge from '$lib/client/ui/badge/Badge.svelte';
 	import DateTime from '$lib/client/ui/datetime/DateTime.svelte';
 	import type { Column } from '$lib/client/ui/table/types';
-	import {
-		formatChangePath,
-		formatChangeValue,
-		formatHistoryKind,
-		type EntityHistoryItem
-	} from '$lib/shared/utils/pcd/history';
-	import type { EntityChange } from '$lib/types/pcd';
+	import { formatHistoryKind, type EntityHistoryItem } from '$lib/shared/utils/pcd/history';
+	import type { ChangeDetail, ChangeView, SummaryPart } from '$lib/shared/utils/pcd/history-view';
 
 	interface Props {
 		history: EntityHistoryItem[];
@@ -48,6 +43,12 @@
 		updated: 'info'
 	};
 
+	const segmentClass = {
+		same: '',
+		added: 'bg-success-bg text-success-text',
+		removed: 'bg-danger-bg text-danger-text line-through'
+	} as const;
+
 	function changeSummary(item: EntityHistoryItem): string {
 		if (item.kind === 'created') return 'Entity created';
 		if (item.kind === 'deleted') return 'Entity deleted';
@@ -56,8 +57,8 @@
 		return item.kind === 'renamed' ? `Renamed from ${item.renamedFrom}, ${base}` : base;
 	}
 
-	function isMono(change: EntityChange): boolean {
-		return change.path === 'pattern' || change.path.startsWith('formats');
+	function hasDetails(item: EntityHistoryItem): boolean {
+		return item.changes.length > 0 || item.related.length > 0 || item.kind === 'renamed';
 	}
 </script>
 
@@ -88,42 +89,63 @@
 	{/if}
 {/snippet}
 
-{#snippet changeValue(change: EntityChange)}
-	<span class="text-sm {isMono(change) ? 'font-mono break-all' : ''}">
-		{#if change.kind === 'added'}
-			<span class="text-success-text">{formatChangeValue(change.to)}</span>
-		{:else if change.kind === 'removed'}
-			<span class="text-danger-text line-through">{formatChangeValue(change.from)}</span>
+{#snippet summary(parts: SummaryPart[])}
+	{#each parts as part, index (index)}
+		{#if part.kind === 'text'}
+			{part.text}
+		{:else if part.href}
+			<a
+				href={part.href}
+				class="font-mono text-link-text hover:underline">{part.text}</a>
 		{:else}
-			<span class="text-danger-text line-through">{formatChangeValue(change.from)}</span>
-			<span
-				class="text-text-muted"
-				aria-hidden="true">→</span>
-			<span class="sr-only">to</span>
-			<span class="text-success-text">{formatChangeValue(change.to)}</span>
+			<span class="font-mono">{part.text}</span>
 		{/if}
-	</span>
+	{/each}
+{/snippet}
+
+{#snippet detail(view: ChangeDetail)}
+	{#if view.kind === 'lines'}
+		<pre
+			class="mt-1 overflow-x-auto rounded-control border border-border-subtle bg-surface px-3 py-2 font-mono text-xs leading-5">{#each view.lines as line, index (index)}<span
+					class="block {segmentClass[line.kind]}"
+					>{line.kind === 'added'
+						? '+'
+						: line.kind === 'removed'
+							? '-'
+							: ' '} {line.text}</span
+				>{/each}</pre>
+	{:else}
+		<p
+			class="mt-1 rounded-control border border-border-subtle bg-surface px-3 py-2 font-mono text-xs leading-5 break-all">
+			{#each view.segments as segment, index (index)}<span class={segmentClass[segment.kind]}
+					>{segment.text}</span
+				>{/each}
+		</p>
+	{/if}
+{/snippet}
+
+{#snippet change(view: ChangeView)}
+	<li class="text-sm">
+		{@render summary(view.summary)}
+		{#if view.detail}
+			{@render detail(view.detail)}
+		{/if}
+	</li>
 {/snippet}
 
 {#snippet details(item: EntityHistoryItem)}
 	{#if item.kind === 'renamed'}
 		<p class="text-sm">
 			<span class="text-text-muted">Renamed from</span>
-			<span class="font-medium">{item.renamedFrom}</span>
+			<span class="font-mono">{item.renamedFrom}</span>
 		</p>
 	{/if}
 	{#if item.changes.length > 0}
-		<dl class="space-y-2">
-			{#each item.changes as change (change.path + change.kind)}
-				<div
-					class="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
-					<dt class="shrink-0 text-sm text-text-muted">
-						{formatChangePath(change.path)}
-					</dt>
-					<dd class="text-right">{@render changeValue(change)}</dd>
-				</div>
+		<ul class="space-y-2">
+			{#each item.changes as view, index (index)}
+				{@render change(view)}
 			{/each}
-		</dl>
+		</ul>
 	{/if}
 	{#if item.related.length > 0}
 		<div class="mt-4">
@@ -163,7 +185,7 @@
 				{/if}
 			{/snippet}
 			{#snippet expanded(row)}
-				{#if row.item.changes.length > 0 || row.item.related.length > 0 || row.item.kind === 'renamed'}
+				{#if hasDetails(row.item)}
 					{@render details(row.item)}
 				{/if}
 			{/snippet}

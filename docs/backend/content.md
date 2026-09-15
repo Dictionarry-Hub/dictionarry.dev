@@ -33,6 +33,16 @@ link, change title, date), expandable to the field-level diff and links to the o
 changed in the same commit. History is compiled from the PCD repo's op log by the pipeline (see
 [tooling/pcd.md](../tooling/pcd.md#history)) and appears in both HTML and Markdown representations.
 
+The expanded diff is a list of one-line summaries, not raw fields.
+`src/lib/shared/utils/pcd/ history-view.ts` has a presenter per change shape that matters (profile
+scoring, custom format conditions, regex patterns, profile qualities, tags, quality definition
+tiers, and scalar fields), each writing a sentence like "Release Group coffee added" with entity
+names in mono and linked to their pages when they still exist. A regex pattern change carries a
+character-level diff and a description change a line diff. Shapes without a presenter fall back to a
+line diff of the changed subtree rendered as YAML, the same YAML the entity export view uses.
+Changes that display identically before and after (a tier max size moving between two unlimited
+values) are hidden.
+
 Seven entity types are browsable:
 
 | Entity Type         | Route segment         | Arr-specific |

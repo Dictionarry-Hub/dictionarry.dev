@@ -10,6 +10,7 @@ import {
 	shortHash,
 	type EntityHistoryItem
 } from './history.js';
+import { presentChange, type PresentContext } from './history-view.js';
 
 const files = import.meta.glob<EntityHistory>('/src/lib/data/pcd/history/*.json', {
 	eager: true,
@@ -21,13 +22,39 @@ function historyFor(database: string): EntityHistory | null {
 	return entry ? entry[1] : null;
 }
 
+/** Current entities of a database keyed like the history (`${entityType}:${name}`). */
+function entityIndex(data: CompiledDatabase): Map<string, unknown> {
+	const index = new Map<string, unknown>();
+	const add = (entityType: string, entities: { name: string }[]) => {
+		for (const entity of entities) index.set(`${entityType}:${entity.name}`, entity);
+	};
+	add('custom_format', data.customFormats);
+	add('quality_profile', data.qualityProfiles);
+	add('regular_expression', data.regularExpressions);
+	add('delay_profile', data.delayProfiles);
+	for (const arr of ['radarr', 'sonarr'] as const) {
+		add(`${arr}_naming`, data.media[arr].naming);
+		add(`${arr}_media_settings`, data.media[arr].settings);
+		add(`${arr}_quality_definitions`, data.media[arr].qualityDefinitions);
+	}
+	return index;
+}
+
 /** History of one entity, newest first. Empty when none was compiled. */
 export function entityHistory(
-	data: Pick<CompiledDatabase, 'id' | 'repo'>,
+	data: CompiledDatabase,
 	entityType: string,
 	name: string
 ): EntityHistoryItem[] {
 	const entries = historyFor(data.id)?.[`${entityType}:${name}`] ?? [];
+	if (entries.length === 0) return [];
+
+	const index = entityIndex(data);
+	const ctx: PresentContext = {
+		database: data.id,
+		exists: (type, entityName) => index.has(`${type}:${entityName}`),
+		current: index.get(`${entityType}:${name}`) ?? null
+	};
 
 	return entries
 		.map((entry) => ({
@@ -39,7 +66,10 @@ export function entityHistory(
 			commitUrl: entry.hash === null ? null : commitUrl(data.repo, entry.hash),
 			kind: entry.kind,
 			...(entry.renamedFrom === undefined ? {} : { renamedFrom: entry.renamedFrom }),
-			changes: entry.changes,
+			changes: entry.changes.flatMap((change) => {
+				const view = presentChange(entityType, change, ctx);
+				return view === null ? [] : [view];
+			}),
 			related: entry.related.flatMap((ref) => {
 				const href = entityHref(data.id, ref.entityType, ref.name);
 				return href === null

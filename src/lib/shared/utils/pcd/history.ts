@@ -2,15 +2,16 @@
 // llm serializers so the History section and its markdown artifact cannot
 // drift apart. Loading the compiled history lives in history-data.ts.
 
-import type { EntityChange, HistoryEntry } from '$lib/types/pcd';
+import type { HistoryEntry } from '$lib/types/pcd';
 import { slugify } from '$lib/shared/utils/slug';
+import type { ChangeView } from './history-view.js';
 
 export interface EntityHistoryLink {
 	label: string;
 	href: string;
 }
 
-/** A history entry resolved for display: links built, hash shortened. */
+/** A history entry resolved for display: changes presented, links built, hash shortened. */
 export interface EntityHistoryItem {
 	op: number;
 	title: string;
@@ -20,7 +21,7 @@ export interface EntityHistoryItem {
 	commitUrl: string | null;
 	kind: HistoryEntry['kind'];
 	renamedFrom?: string;
-	changes: EntityChange[];
+	changes: ChangeView[];
 	related: EntityHistoryLink[];
 }
 
@@ -140,26 +141,6 @@ export function formatChangePath(path: string): string {
 		if (item !== undefined) parts.push(item.replace(/\|(radarr|sonarr)$/, ' ($1)'));
 	}
 	return parts.join(' › ');
-}
-
-export function formatChangeValue(value: unknown): string {
-	if (value === null || value === undefined) return 'none';
-	if (typeof value === 'string') return value === '' ? 'empty' : value;
-	if (typeof value === 'number') return String(value);
-	if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-	if (Array.isArray(value)) {
-		return value.length === 0 ? 'none' : value.map(formatChangeValue).join(', ');
-	}
-	if (typeof value === 'object') {
-		return Object.entries(value as Record<string, unknown>)
-			.filter(([key]) => key !== 'name')
-			.map(
-				([key, inner]) =>
-					`${FIELD_LABELS[key] ?? humanize(key)}: ${formatChangeValue(inner)}`
-			)
-			.join('; ');
-	}
-	return String(value);
 }
 
 function humanize(key: string): string {
