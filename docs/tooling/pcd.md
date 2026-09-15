@@ -160,9 +160,9 @@ All output goes to `src/lib/data/pcd/` (gitignored).
 **Per-database JSON** (`{id}.json`): Full entity data typed as `CompiledDatabase`. One file per
 database. These are consumed by `+page.server.ts` load functions for entity detail pages.
 
-**Nav index** (`index.json`): Entity names only, keyed by database ID. Consumed by
-`+layout.server.ts` to populate the sidebar. Kept separate to avoid shipping full entity data to
-every page.
+**Nav index** (`index.json`): Entity names only, keyed by database ID. Drives the prerender entries
+(`src/lib/shared/utils/pcd/prerender.ts`) and the per-database `/pcd/{database}/nav.json` endpoint
+the sidebar fetches at view time. Kept separate to avoid shipping full entity data to every page.
 
 **Per-database history** (`history/{id}.json`): `EntityHistory` from `src/lib/types/pcd.ts`, keyed
 by `{entityType}:{name}` (entity types as they appear in op markers, e.g. `custom_format`,

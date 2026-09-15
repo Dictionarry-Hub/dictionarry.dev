@@ -1,25 +1,16 @@
 import pcdNavData from '../../../data/pcd/index.json';
 import { slugify } from '../slug.js';
-
-interface ArrEntityEntry {
-	name: string;
-	arrType: string;
-}
-
-interface PcdNavDatabase {
-	customFormats: string[];
-	qualityProfiles: string[];
-	regularExpressions: string[];
-	delayProfiles: string[];
-	naming: ArrEntityEntry[];
-	mediaSettings: ArrEntityEntry[];
-	qualityDefinitions: ArrEntityEntry[];
-}
+import type { PcdNavDatabase, PcdNavIndex } from '$lib/types/pcd';
 
 type NamedEntityKey = 'customFormats' | 'qualityProfiles' | 'regularExpressions' | 'delayProfiles';
 type ArrEntityKey = 'naming' | 'mediaSettings' | 'qualityDefinitions';
 
-const pcdNav = pcdNavData as Record<string, PcdNavDatabase>;
+const pcdNav = pcdNavData as PcdNavIndex;
+
+/** Entity names of one database, for the sidebar endpoint. */
+export function pcdNavDatabase(database: string): PcdNavDatabase | undefined {
+	return pcdNav[database];
+}
 
 export function pcdDatabaseEntries(): { database: string }[] {
 	return Object.keys(pcdNav).map((database) => ({ database }));

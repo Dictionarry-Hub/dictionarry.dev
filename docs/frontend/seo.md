@@ -18,6 +18,15 @@ required for crawlers to see the content.
 The rule: if a crawler needs to see it, it goes in the server load function. Anything in `onMount`
 or client-side fetch is invisible to crawlers.
 
+### Navigation fetched at view time
+
+The sidebar's PCD entity names are not in the prerendered HTML. The root layout fetches
+`/pcd/{database}/nav.json` after mount and fills the groups in. Crawlers never saw those names as
+links anyway (groups render collapsed), and every entity page is reachable through its list page,
+which is prerendered with a link to each entity. Keeping the index out of page data saves about 55
+KB on each of the 4,500 PCD pages. Without JavaScript the sidebar shows the seven group links and
+the list pages still work.
+
 ### Locale-dependent text
 
 Pre-rendered HTML carries whatever the build machine produced. Text that depends on the visitor's

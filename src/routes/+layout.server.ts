@@ -1,26 +1,11 @@
+import type { PcdNavIndex } from '$lib/types/pcd';
+
 export const prerender = true;
 
 interface ArticleMeta {
 	title: string;
 	slug: string;
 	created: string;
-}
-
-interface PcdNavEntry {
-	name: string;
-	arrType: string;
-}
-
-interface PcdNavIndex {
-	[databaseId: string]: {
-		customFormats: string[];
-		qualityProfiles: string[];
-		regularExpressions: string[];
-		delayProfiles: string[];
-		naming: PcdNavEntry[];
-		mediaSettings: PcdNavEntry[];
-		qualityDefinitions: PcdNavEntry[];
-	};
 }
 
 function articleNav(files: Record<string, { metadata: ArticleMeta }>, base: string) {
@@ -48,10 +33,13 @@ export async function load() {
 	const devLogs = articleNav(devLogFiles, '/dev-logs');
 	const wiki = articleNav(wikiFiles, '/wiki');
 
+	// Which databases have compiled data. The entity names themselves are
+	// fetched per database at view time (see /pcd/[database]/nav.json), so
+	// 4,500 prerendered pages do not each carry the full index.
 	const pcdNavFiles = import.meta.glob<{ default: PcdNavIndex }>('/src/lib/data/pcd/index.json', {
 		eager: true
 	});
-	const pcdNav: PcdNavIndex = Object.values(pcdNavFiles)[0]?.default ?? {};
+	const pcdDatabases = Object.keys(Object.values(pcdNavFiles)[0]?.default ?? {});
 
-	return { devLogs, wiki, pcdNav };
+	return { devLogs, wiki, pcdDatabases };
 }
