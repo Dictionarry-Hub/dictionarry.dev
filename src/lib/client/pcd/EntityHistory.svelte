@@ -289,8 +289,8 @@
 				{:else if column.key === 'date'}
 					<DateTime
 						date={row.date}
-						format="iso"
-						class="font-mono text-text-muted" />
+						format="numeric"
+						class="text-text-muted" />
 				{/if}
 			{/snippet}
 			{#snippet expanded(row)}
@@ -307,8 +307,7 @@
 					{@render commitLink(row.item)}
 					<DateTime
 						date={row.date}
-						format="iso"
-						class="font-mono" />
+						format="numeric" />
 				</div>
 				<p class="mt-2 text-sm text-text-muted">{changeSummary(row.item)}</p>
 			{/snippet}

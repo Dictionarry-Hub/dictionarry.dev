@@ -557,14 +557,15 @@ Inline label for tags, statuses, and counts.
 
 Renders a formatted `<time>` element with a `datetime` attribute for SEO.
 
-| Prop     | Type                         | Required | Default  |
-| -------- | ---------------------------- | -------- | -------- |
-| `date`   | `string`                     | yes      |          |
-| `format` | `'short' \| 'long' \| 'iso'` | no       | `'long'` |
+| Prop     | Type                             | Required | Default  |
+| -------- | -------------------------------- | -------- | -------- |
+| `date`   | `string`                         | yes      |          |
+| `format` | `'short' \| 'long' \| 'numeric'` | no       | `'long'` |
 
-Short format: "May 17". Long format: "May 17, 2026". ISO format: "2026-05-17", for dense tables
-where the column should stay narrow and sort visibly. Accepts ISO date strings and full ISO
-timestamps (as produced by YAML date parsing).
+Short format: "May 17". Long format: "May 17, 2026". Both are fixed to en-US. Numeric format is all
+digits in the visitor's locale ("5/17/2026" or "17/05/2026"), for dense tables; the prerendered text
+uses the build machine's locale and is patched on hydration. The `datetime` attribute is always ISO.
+Accepts ISO date strings and full ISO timestamps (as produced by YAML date parsing).
 
 ### Author
 
